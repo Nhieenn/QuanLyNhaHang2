@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+@theme inline {
+  /* Definitive Brand Palette - From Figma Inspect */
+  --color-primary: #006760; 
+  --color-primary-container: #73f1e4; 
+  --color-on-primary-container: #005852;
+  --color-primary-light: #bffff6;
+  
+  --color-brand-gold: #ffca51; 
+  --color-on-gold: #5c4300;
+  
+  --color-brand-coral: #ff928f; 
+  --color-on-coral: #680211;
+  
+  --color-surface: #f7f6f3; 
+  --color-surface-container: #e8e8e5; 
+  --color-surface-container-low: #f1f1ee; 
+  --color-surface-container-highest: #ddddd9; 
+  --color-surface-container-lowest: #ffffff; 
+  
+  --color-on-surface: #2e2f2d;
+  --color-outline: #767775;
+
+  /* Typography */
+  --font-sans: var(--font-work-sans);
+  --font-display: var(--font-plus-jakarta-sans);
+
+  /* Elevation */
+  --shadow-ambient: 0 4px 20px rgba(46, 47, 45, 0.1);
+
+  /* Spacing / Radii */
+  --radius-md: 0.75rem; /* 12px */
+  --radius-xl: 1rem; /* 16px - Refined for W216 H152 */
+}
+
+:root {
+  --background: var(--color-surface);
+  --foreground: var(--color-on-surface);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+}
+
+/* The "No-Line" Rule: Borders are prohibited for sectioning. Use background shifts. */
+.no-border-section {
+  border: none !important;
+}
+
+/* Tablet touch target helper */
+.touch-target {
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

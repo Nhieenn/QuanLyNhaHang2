@@ -1,0 +1,12 @@
+# Project Memory & Continuity Rules
+
+1. **Progress Tracking**:
+   - Sau mỗi khi hoàn thành một tính năng hoặc trước khi kết thúc phiên làm việc, BẮT BUỘC phải cập nhật tiến độ vào file `PROGRESS.md`.
+   - Mọi phiên làm việc mới phải bắt đầu bằng việc đọc `PROGRESS.md` để nắm bắt bối cảnh.
+
+2. **Git Discipline**:
+   - Tuân thủ nghiêm ngặt quy trình trong `.agent/workflows/git_version_control.md`.
+   - Không merge vào `main` khi chưa có sự xác nhận trực tiếp từ người dùng.
+
+3. **Status Sync**:
+   - Đảm bảo trạng thái món ăn (KitchenStore) luôn là "nguồn sự thật duy nhất" giữa các màn hình.
