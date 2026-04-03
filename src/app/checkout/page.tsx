@@ -1,114 +1,244 @@
 "use client";
 
-import React from "react";
-import { CreditCard, Banknote, QrCode, Wallet, ChevronRight, User, ReceiptText } from "lucide-react";
+import React, { useState } from "react";
+import { 
+  CreditCard, 
+  Banknote, 
+  QrCode, 
+  Wallet, 
+  ChevronRight, 
+  ReceiptText, 
+  User, 
+  Users,
+  ShieldCheck,
+  Printer,
+  Mail,
+  History,
+  Copy
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
+interface BillItem {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  type: "drink" | "food";
+}
+
+const BILL_ITEMS: BillItem[] = [
+  { id: "i1", name: "Oat Milk Latte", price: 5.50, quantity: 2, type: "drink" },
+  { id: "i2", name: "Ceremonial Matcha", price: 6.50, quantity: 1, type: "drink" },
+  { id: "i3", name: "Sourdough Toast", price: 12.00, quantity: 1, type: "food" },
+  { id: "i4", name: "Butter Croissant", price: 4.50, quantity: 2, type: "food" }
+];
+
 export default function CheckoutPage() {
-  return (
-    <div className="max-w-[1200px] mx-auto flex flex-col lg:flex-row gap-12">
-      {/* Bill Overview */}
-      <div className="flex-1 space-y-8">
-        <div className="bg-surface-container-low rounded-[32px] p-8 no-border-section shadow-sm">
-           <div className="flex justify-between items-start mb-8">
-              <div>
-                <h2 className="text-3xl font-display font-bold text-on-surface">Payment Summary</h2>
-                <p className="text-on-surface/50 font-sans">Table 12 • 4 Guests • Order #8818</p>
-              </div>
-              <div className="text-right">
-                 <span className="text-sm font-bold text-on-surface/40 uppercase tracking-widest">Total Amount</span>
-                 <p className="text-5xl font-display font-bold text-primary">$120.00</p>
-              </div>
-           </div>
+  const [paymentMethod, setPaymentMethod] = useState<string>("card");
+  const [isSuccess, setIsSuccess] = useState(false);
 
-           <div className="space-y-4">
-              <BillItem name="Truffle Mushroom Risotto" qty={2} price={48.00} />
-              <BillItem name="Grilled Halloumi Salad" qty={2} price={32.00} />
-              <BillItem name="Oat Milk Latte" qty={3} price={16.50} />
-              <BillItem name="Provisional Fee (5%)" price={6.00} isSecondary />
-              <div className="pt-4 border-t border-surface-container-highest flex justify-between items-baseline">
-                 <span className="text-xl font-display font-bold text-on-surface">Subtotal</span>
-                 <span className="text-2xl font-display font-bold text-on-surface">$102.50</span>
-              </div>
-           </div>
+  const subtotal = BILL_ITEMS.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+  const tax = subtotal * 0.085;
+  const serviceFee = 4.00;
+  const total = subtotal + tax + serviceFee;
+
+  const handleCompletePayment = () => {
+    setIsSuccess(true);
+    // Real logic would be here
+  };
+
+  if (isSuccess) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center min-h-[60vh] animate-in zoom-in-95 duration-500">
+        <div className="w-24 h-24 bg-brand-teal rounded-full flex items-center justify-center text-[#006a67] shadow-xl mb-8">
+          <ShieldCheck size={48} strokeWidth={2.5} />
         </div>
-
-        {/* Guest Selection */}
-        <div className="bg-surface-container-highest/20 rounded-[32px] p-8 no-border-section">
-           <h3 className="text-xl font-display font-bold text-on-surface mb-6">Payment Splits</h3>
-           <div className="flex gap-4">
-              <SplitOption active label="Single Payer" />
-              <SplitOption label="Split by 4" />
-              <SplitOption label="Custom Amount" />
-           </div>
+        <h2 className="text-4xl font-black text-on-surface tracking-tight">Payment Successful</h2>
+        <p className="text-outline mt-2 font-bold mb-10">Order #8818 has been processed and billed.</p>
+        
+        <div className="flex gap-4">
+          <button className="px-10 py-5 rounded-2xl bg-white border border-surface-container-low font-black text-sm uppercase tracking-widest hover:bg-surface-container-low transition-all flex items-center gap-2">
+            <Printer size={18} />
+            Print Receipt
+          </button>
+          <button onClick={() => window.location.href = "/table-map"} className="px-10 py-5 rounded-2xl bg-[#006a67] text-white font-black text-sm uppercase tracking-widest hover:bg-[#005a57] transition-all flex items-center gap-2 shadow-lg">
+            Back to Home
+            <ChevronRight size={18} />
+          </button>
         </div>
       </div>
+    );
+  }
 
-      {/* Payment Methods */}
-      <div className="w-full lg:w-[450px] space-y-6">
-         <h3 className="text-xl font-display font-bold text-on-surface">Payment Methods</h3>
-         <div className="grid grid-cols-2 gap-4">
-            <PaymentMethod icon={CreditCard} label="Credit Card" active />
-            <PaymentMethod icon={Banknote} label="Cash Payment" />
-            <PaymentMethod icon={QrCode} label="Scan to Pay" />
-            <PaymentMethod icon={Wallet} label="E-Wallet" />
-         </div>
+  return (
+    <div className="flex flex-col lg:flex-row gap-12 max-w-7xl mx-auto px-4 lg:px-10 pb-20">
+      {/* Bill Overview */}
+      <div className="flex-1 space-y-10">
+        <div className="bg-white rounded-[40px] p-10 shadow-ambient border border-surface-container-low relative overflow-hidden">
+          {/* Decorative highlight */}
+          <div className="absolute top-0 left-0 w-full h-2 bg-brand-teal" />
+          
+          <div className="flex justify-between items-start mb-10">
+            <div>
+              <h2 className="text-4xl font-black text-on-surface tracking-tight">Bill Overview</h2>
+              <p className="text-outline mt-1 font-bold">Table 12 • 4 Guests • Order #8818</p>
+            </div>
+            <div className="text-right">
+              <span className="text-[10px] font-black text-outline uppercase tracking-[0.2em] block mb-1">TOTAL AMOUNT</span>
+              <p className="text-5xl font-black text-primary tracking-tighter">${total.toFixed(2)}</p>
+            </div>
+          </div>
 
-         <div className="mt-12 bg-white rounded-[32px] p-8 shadow-ambient no-border-section space-y-6">
-            <div className="flex items-center gap-4 p-4 bg-surface-container-low rounded-2xl">
-               <div className="w-12 h-12 rounded-full bg-primary-container flex items-center justify-center">
-                  <ReceiptText size={24} className="text-primary" />
-               </div>
-               <div className="flex-1">
-                  <p className="text-sm font-bold text-on-surface">E-Receipt</p>
-                  <p className="text-xs text-on-surface/50">Send to customer's email</p>
-               </div>
-               <div className="w-12 h-6 bg-surface-container-highest rounded-full flex items-center px-1">
-                   <div className="w-4 h-4 rounded-full bg-white shadow-sm" />
-               </div>
+          <div className="space-y-6">
+            <div className="max-h-[320px] overflow-y-auto pr-4 custom-scrollbar space-y-5">
+              {BILL_ITEMS.map((item) => (
+                <div key={item.id} className="flex items-center gap-4 group">
+                  <div className="w-14 h-14 rounded-2xl bg-surface-container-low flex items-center justify-center flex-shrink-0">
+                    <img 
+                      src={item.type === "drink" ? "/icon_drink_symbolic_1775236028971.png" : "/icon_food_symbolic_1775236042870.png"} 
+                      alt="" 
+                      className="w-10 h-10 object-contain grayscale opacity-50 group-hover:grayscale-0 group-hover:opacity-100 transition-all"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-base font-black text-on-surface">{item.name}</h4>
+                    <span className="text-xs font-bold text-outline">x{item.quantity} • Unit Price: ${item.price.toFixed(2)}</span>
+                  </div>
+                  <p className="text-lg font-black text-on-surface">${(item.price * item.quantity).toFixed(2)}</p>
+                </div>
+              ))}
             </div>
 
-            <button className="w-full h-20 bg-primary text-white text-xl font-display font-bold rounded-2xl shadow-ambient hover:bg-primary-dim transition-all flex items-center justify-center gap-3 active:scale-95 touch-target">
-               COMPLETE PAYMENT
-               <ChevronRight size={24} />
-            </button>
-         </div>
+            <div className="pt-8 border-t-2 border-dashed border-surface-container mt-8 space-y-4">
+              <div className="flex justify-between text-outline text-sm font-bold">
+                <span>Subtotal</span>
+                <span>${subtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-outline text-sm font-bold">
+                <span>Service Fee</span>
+                <span>${serviceFee.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-outline text-sm font-bold">
+                <span>Tax (8.5%)</span>
+                <span>${tax.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center text-on-surface text-3xl font-black mt-4 pt-4">
+                <span className="tracking-tight">Grand Total</span>
+                <span className="text-primary">${total.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Split Bill Card */}
+        <div className="bg-surface-container-low rounded-[32px] p-8 flex justify-between items-center group cursor-pointer hover:bg-white transition-all shadow-sm border border-surface-container-low">
+          <div className="flex items-center gap-6">
+            <div className="w-16 h-16 rounded-2xl bg-white flex items-center justify-center text-[#006a67] shadow-sm">
+              <Users size={32} />
+            </div>
+            <div>
+              <h3 className="text-xl font-black text-on-surface leading-none">Split Bill</h3>
+              <p className="text-outline text-sm font-bold mt-1">Divide the payment between guests</p>
+            </div>
+          </div>
+          <ChevronRight className="text-outline group-hover:translate-x-1 transition-transform" />
+        </div>
+      </div>
+
+      {/* Payment Side */}
+      <div className="w-full lg:w-[480px] flex flex-col gap-8">
+        <h3 className="text-xl font-black text-on-surface tracking-tight uppercase tracking-widest pl-2 opacity-60">Payment Methods</h3>
+        
+        <div className="grid grid-cols-2 gap-6">
+          <PaymentOption 
+            active={paymentMethod === "card"} 
+            onClick={() => setPaymentMethod("card")}
+            icon={CreditCard} 
+            label="Credit Card" 
+          />
+          <PaymentOption 
+            active={paymentMethod === "cash"} 
+            onClick={() => setPaymentMethod("cash")}
+            icon={Banknote} 
+            label="Cash Payment" 
+          />
+          <PaymentOption 
+            active={paymentMethod === "qr"} 
+            onClick={() => setPaymentMethod("qr")}
+            icon={QrCode} 
+            label="Scan to Pay" 
+          />
+          <PaymentOption 
+            active={paymentMethod === "wallet"} 
+            onClick={() => setPaymentMethod("wallet")}
+            icon={Wallet} 
+            label="E-Wallet" 
+          />
+        </div>
+
+        <div className="bg-white rounded-[40px] p-8 shadow-ambient mt-4 space-y-8">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between p-5 bg-surface-container-low rounded-2xl border border-surface-container active:scale-[0.98] transition-all cursor-pointer">
+              <div className="flex items-center gap-4">
+                <Mail className="text-[#006a67]" />
+                <span className="text-sm font-bold">Email Receipt</span>
+              </div>
+              <div className="w-10 h-6 bg-brand-teal rounded-full flex items-center justify-end px-1 shadow-inner">
+                <div className="w-4 h-4 rounded-full bg-white shadow-sm" />
+              </div>
+            </div>
+            <div className="flex items-center justify-between p-5 bg-surface-container-low rounded-2xl border border-surface-container active:scale-[0.98] transition-all cursor-pointer">
+              <div className="flex items-center gap-4">
+                <Printer className="text-brand-gold" />
+                <span className="text-sm font-bold">Print after payment</span>
+              </div>
+              <div className="w-10 h-6 bg-brand-gold rounded-full flex items-center justify-end px-1 shadow-inner">
+                <div className="w-4 h-4 rounded-full bg-white shadow-sm" />
+              </div>
+            </div>
+          </div>
+
+          <button 
+            onClick={handleCompletePayment}
+            className="w-full bg-[#006a67] text-white py-6 rounded-[24px] font-black text-xl flex items-center justify-center gap-4 shadow-lg hover:bg-[#005a57] transition-all active:scale-95 group mb-4"
+          >
+            Complete Payment
+            <ChevronRight className="group-hover:translate-x-1 transition-transform" />
+          </button>
+          
+          <p className="text-[10px] font-black text-outline text-center uppercase tracking-widest opacity-40">
+            By completing, you agree to our terms of service
+          </p>
+        </div>
+
+        {/* Floating help or history tip */}
+        <div className="flex items-center gap-3 justify-center text-outline opacity-60 hover:opacity-100 transition-opacity cursor-pointer">
+          <History size={16} />
+          <span className="text-xs font-bold uppercase tracking-widest">Recent Transactions</span>
+        </div>
       </div>
     </div>
   );
 }
 
-function BillItem({ name, qty, price, isSecondary }: { name: string; qty?: number; price: number; isSecondary?: boolean }) {
+function PaymentOption({ icon: Icon, label, active, onClick }: { icon: any; label: string; active: boolean; onClick: () => void }) {
   return (
-    <div className="flex justify-between items-baseline py-1">
-      <div className="flex gap-2 items-baseline">
-        {qty && <span className="text-xs font-bold text-primary">x{qty}</span>}
-        <span className={cn("text-sm font-sans", isSecondary ? "text-on-surface/40" : "font-bold text-on-surface")}>{name}</span>
+    <div 
+      onClick={onClick}
+      className={cn(
+        "flex flex-col items-center justify-center gap-4 aspect-square rounded-[32px] cursor-pointer transition-all border-2",
+        active 
+          ? "bg-brand-teal/20 border-brand-teal text-[#006a67] shadow-lg scale-105" 
+          : "bg-white border-transparent text-outline hover:bg-surface-container-low shadow-sm"
+      )}
+    >
+      <div className={cn(
+        "w-16 h-16 rounded-2xl flex items-center justify-center transition-colors",
+        active ? "bg-white text-[#006a67] shadow-sm" : "bg-surface-container-low text-outline"
+      )}>
+        <Icon size={32} strokeWidth={2.5} />
       </div>
-      <span className={cn("text-sm font-display font-bold text-on-surface", isSecondary && "text-on-surface/40")}>${price.toFixed(2)}</span>
+      <span className="text-sm font-black tracking-tight">{label}</span>
     </div>
-  );
-}
-
-function SplitOption({ active, label }: { active?: boolean; label: string }) {
-  return (
-    <button className={cn(
-      "px-6 py-4 rounded-2xl font-display font-bold text-sm transition-all shadow-sm",
-      active ? "bg-primary text-white" : "bg-white text-on-surface/50 hover:bg-white/80"
-    )}>
-      {label}
-    </button>
-  );
-}
-
-function PaymentMethod({ icon: Icon, label, active }: { icon: any; label: string; active?: boolean }) {
-  return (
-    <button className={cn(
-      "flex flex-col items-center justify-center gap-3 aspect-square rounded-3xl transition-all shadow-sm group",
-      active ? "bg-primary-container text-primary border-2 border-primary/20" : "bg-white text-on-surface/50 hover:bg-surface-container-highest/50 "
-    )}>
-      <Icon size={32} className={cn("group-hover:scale-110 transition-transform", active ? "text-primary" : "text-on-surface/20")} />
-      <span className="text-xs font-bold font-sans">{label}</span>
-    </button>
   );
 }
