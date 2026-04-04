@@ -15,6 +15,9 @@ import {
   RefreshCw
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useTableStore } from "@/store/tableStore";
+import { Suspense } from "react";
 
 interface InvoiceItem {
   id: string;
@@ -31,16 +34,54 @@ const INVOICE_ITEMS: InvoiceItem[] = [
 ];
 
 export default function CheckoutPage() {
+  return (
+    <Suspense fallback={<div>Loading checkout...</div>}>
+      <CheckoutContent />
+    </Suspense>
+  );
+}
+
+function CheckoutContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const tableId = searchParams.get("table");
+  const { floors, updateTable } = useTableStore();
+  
   const [paymentMethod, setPaymentMethod] = useState<string>("card");
   const [isSuccess, setIsSuccess] = useState(false);
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
 
-  const subtotal = 80.00;
-  const serviceCharge = 8.00;
-  const total = 88.00;
+  // Tìm bàn thực tế
+  let currentTable: any = null;
+  let currentFloorIndex = 0;
+  for (let i = 0; i < floors.length; i++) {
+    const table = floors[i].tables.find(t => t.id === tableId || t.number === tableId);
+    if (table) {
+      currentTable = table;
+      currentFloorIndex = i;
+      break;
+    }
+  }
+
+  const items = currentTable?.orders || [];
+  const subtotal = items.reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0);
+  const tax = subtotal * 0.10; // 10% VAT
+  const serviceCharge = subtotal * 0.05; // 5% Service
+  const total = subtotal + tax + serviceCharge;
 
   const handleCompletePayment = () => {
-    setIsSuccess(true);
+    if (tableId) {
+      // Clear data and set to empty
+      updateTable(currentFloorIndex, tableId, {
+        status: "empty",
+        guests: undefined,
+        timeElapsed: undefined,
+        orders: []
+      });
+    }
+    
+    // Redirect to feedback
+    router.push("/feedback?showRating=true");
   };
 
   const handlePaymentSelect = (method: string) => {
@@ -122,27 +163,30 @@ export default function CheckoutPage() {
         <div className="flex justify-between items-start mb-12">
           <div>
             <h2 className="text-4xl font-black text-on-surface tracking-tight leading-none mb-2">Invoice</h2>
-            <p className="text-sm font-bold text-outline tracking-tight">Order #88294 • Table 12</p>
+            <p className="text-sm font-bold text-outline tracking-tight">Table {currentTable?.number || tableId}</p>
           </div>
           <div className="text-right">
             <span className="text-[10px] font-black text-outline uppercase tracking-widest block mb-1">GUESTS</span>
-            <p className="text-xl font-black text-on-surface">4 Persons</p>
+            <p className="text-xl font-black text-on-surface">{currentTable?.guests || 0} Persons</p>
           </div>
         </div>
 
         {/* Item List */}
-        <div className="space-y-6 mb-10">
-          {INVOICE_ITEMS.map((item) => (
-            <div key={item.id} className="flex items-center justify-between">
+        <div className="space-y-6 mb-10 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+          {items.map((item: any) => (
+            <div key={item.cartId} className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center text-sm font-black text-on-surface/50">
                   {item.quantity}x
                 </div>
                 <h4 className="text-base font-black text-on-surface">{item.name}</h4>
               </div>
-              <p className="text-base font-black text-on-surface">${item.price.toFixed(2)}</p>
+              <p className="text-base font-black text-on-surface">${(item.price * item.quantity).toFixed(2)}</p>
             </div>
           ))}
+          {items.length === 0 && (
+            <p className="text-center text-outline italic py-10">No items found for this table.</p>
+          )}
         </div>
 
         {/* Breakdown */}

@@ -10,9 +10,18 @@ import {
   Minus, 
   Trash2, 
   Printer, 
-  SendHorizontal 
+  SendHorizontal,
+  Bell as BellIcon,
+  CheckCircle2,
+  X,
+  ChevronRight,
+  StickyNote,
+  FileText
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useTableStore, MenuItem as StoreMenuItem } from "@/store/tableStore";
+import { Suspense } from "react";
 
 interface MenuItem {
   id: string;
@@ -78,38 +87,48 @@ interface CartItem extends MenuItem {
 }
 
 export default function OrderMenuPage() {
-  const [cart, setCart] = useState<CartItem[]>([
-    { ...MENU_ITEMS[0], quantity: 1, notes: "No Sugar, Extra Hot" },
-    { ...MENU_ITEMS[2], quantity: 1, notes: "Iced, Honey" },
-    { ...MENU_ITEMS[3], quantity: 1, notes: "Add Poached Egg" }
-  ]);
+  return (
+    <Suspense fallback={<div>Loading order menu...</div>}>
+      <OrderMenuContent />
+    </Suspense>
+  );
+}
 
-  const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+function OrderMenuContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const tableId = searchParams.get("table");
+  const { floors, addOrderItem, confirmOrders, updateItemNote } = useTableStore();
+  
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [noteValue, setNoteValue] = useState("");
+
+  // Tìm bàn hiện tại dựa trên ID từ URL
+  let currentTable: any = null;
+  for (const floor of floors) {
+    const table = floor.tables.find(t => t.id === tableId || t.number === tableId);
+    if (table) {
+      currentTable = table;
+      break;
+    }
+  }
+
+  const cart = currentTable?.orders || [];
+  const pendingItems = cart.filter((i: any) => i.status === "pending");
+  const sentItems = cart.filter((i: any) => i.status === "sent");
+
+  const subtotal = cart.reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0);
   const tax = subtotal * 0.085;
   const total = subtotal + tax;
 
-  const addToCart = (item: MenuItem) => {
-    setCart(prev => {
-      const existing = prev.find(i => i.id === item.id);
-      if (existing) {
-        return prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i);
-      }
-      return [...prev, { ...item, quantity: 1 }];
+  const addToCart = (item: any) => {
+    if (!tableId) return;
+    addOrderItem(tableId, {
+      id: item.id,
+      name: item.name,
+      price: item.price,
+      quantity: 1
     });
-  };
-
-  const removeFromCart = (id: string) => {
-    setCart(prev => prev.filter(i => i.id !== id));
-  };
-
-  const updateQuantity = (id: string, delta: number) => {
-    setCart(prev => prev.map(item => {
-      if (item.id === id) {
-        const newQty = Math.max(1, item.quantity + delta);
-        return { ...item, quantity: newQty };
-      }
-      return item;
-    }));
   };
 
   return (
@@ -173,78 +192,188 @@ export default function OrderMenuPage() {
         {/* Sidebar Header */}
         <div className="p-8 pb-4 flex justify-between items-start">
           <div>
-            <h2 className="text-3xl font-black text-on-surface tracking-tight">Table 12</h2>
-            <p className="text-sm text-outline font-bold mt-1">Active Order • Alex</p>
+            <h2 className="text-3xl font-black text-on-surface tracking-tight">
+              Table {currentTable?.number || "???"}
+            </h2>
+            <p className="text-sm text-outline font-bold mt-1">
+              {currentTable?.guests || 0} Guests • {currentTable?.timeElapsed || "New"}
+            </p>
           </div>
           <button 
-            onClick={() => setCart([])}
-            className="w-12 h-12 flex items-center justify-center rounded-full bg-white text-on-coral shadow-sm hover:bg-brand-coral/10 hover:text-on-coral transition-colors"
+            onClick={() => {
+              if (!tableId) return;
+              const nonPending = cart.filter((i: any) => i.status !== "pending");
+              useTableStore.getState().updateTable(0, tableId, { orders: nonPending });
+            }}
+            className="w-12 h-12 flex items-center justify-center rounded-full bg-white text-brand-coral shadow-sm hover:bg-brand-coral/10 hover:text-on-coral transition-colors"
           >
             <Trash2 size={22} strokeWidth={2.5} />
           </button>
         </div>
 
-        {/* Cart Items */}
+        {/* Cart Items - Unified Running Cart */}
         <div className="flex-1 overflow-y-auto px-8 py-4 custom-scrollbar flex flex-col gap-4">
-          {cart.map((item) => (
-            <div key={item.id} className="bg-white rounded-[24px] p-5 shadow-sm border border-surface-container-low flex items-center gap-4 group animate-in flex-col">
-              <div className="flex w-full items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-brand-teal/10 flex items-center justify-center text-primary font-black text-sm">
+          {cart.map((item: any) => {
+            const isPending = item.status === "pending";
+            const isPreparing = item.status === "preparing";
+            const isReady = item.status === "ready";
+            const isSent = item.status === "sent";
+
+            return (
+              <div 
+                key={item.cartId} 
+                className={cn(
+                  "rounded-[24px] p-5 flex items-center gap-4 transition-all border",
+                  isPending ? "bg-primary/5 border-primary/10" : "bg-white border-surface-container-low shadow-sm"
+                )}
+              >
+                {/* Quantity Badge */}
+                <div className={cn(
+                  "w-12 h-12 rounded-full flex items-center justify-center font-black text-sm shadow-sm flex-shrink-0",
+                  isPending ? "bg-primary text-white" : 
+                  isReady ? "bg-brand-gold text-on-gold animate-pulse" : 
+                  "bg-surface-container-low text-outline"
+                )}>
                   {item.quantity}
                 </div>
+
+                 {/* Name & Subtext */}
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-base font-black text-on-surface">{item.name}</h4>
-                  {item.notes && <p className="text-[10px] text-outline font-medium mt-0.5">{item.notes}</p>}
+                  <div className="flex items-center gap-2">
+                    <h4 className={cn(
+                      "text-base font-black text-on-surface truncate",
+                      !isPending && "font-bold"
+                    )}>{item.name}</h4>
+                    
+                    {/* Note Toggle Icon */}
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingNoteId(item.cartId);
+                        setNoteValue(item.notes || "");
+                      }}
+                      className={cn(
+                        "p-1.5 rounded-lg transition-colors",
+                        item.notes ? "text-primary bg-primary/10" : "text-outline/30 hover:bg-surface-container-low hover:text-outline"
+                      )}
+                    >
+                      <StickyNote size={14} strokeWidth={2.5} />
+                    </button>
+                  </div>
+                  
+                  {editingNoteId === item.cartId ? (
+                    <input 
+                      autoFocus
+                      className="w-full bg-surface-container-low border border-primary/20 rounded-lg px-3 py-1.5 text-xs font-bold text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/30 mt-2"
+                      placeholder="Add note (e.g. Less ice)"
+                      value={noteValue}
+                      onChange={(e) => setNoteValue(e.target.value)}
+                      onBlur={() => {
+                        if (tableId) updateItemNote(tableId, item.cartId, noteValue);
+                        setEditingNoteId(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          if (tableId) updateItemNote(tableId, item.cartId, noteValue);
+                          setEditingNoteId(null);
+                        }
+                      }}
+                    />
+                  ) : item.notes ? (
+                    <p className="text-[10px] text-primary/70 font-black italic mt-1 flex items-center gap-1">
+                      <span className="opacity-40 italic">Note:</span> {item.notes}
+                    </p>
+                  ) : null}
+                  
+                  {isPending && !item.notes && !editingNoteId && (
+                    <p className="text-[10px] text-primary font-bold mt-0.5 animate-pulse">Waiting for confirmation</p>
+                  )}
+                  {isSent && !item.notes && !editingNoteId && (
+                    <p className="text-[10px] text-outline/40 font-medium italic mt-0.5">Order confirmed</p>
+                  )}
                 </div>
-                <p className="text-base font-black text-on-surface">
-                  ${(item.price * item.quantity).toFixed(2)}
-                </p>
-              </div>
-              
-              {/* Desktop Quantity Controls (Subtle) */}
-              <div className="w-full mt-4 pt-4 border-t border-surface-container flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <div className="flex items-center gap-4">
-                  <button onClick={() => updateQuantity(item.id, -1)} className="w-8 h-8 rounded-full bg-surface-container text-on-surface flex items-center justify-center hover:bg-primary hover:text-white transition-all"><Minus size={16} /></button>
-                  <span className="font-black text-sm">{item.quantity}</span>
-                  <button onClick={() => updateQuantity(item.id, 1)} className="w-8 h-8 rounded-full bg-surface-container text-on-surface flex items-center justify-center hover:bg-primary hover:text-white transition-all"><Plus size={16} /></button>
+
+                {/* STATUS LABEL (Between Name and Price) */}
+                <div className="flex-shrink-0 min-w-[80px] flex justify-center">
+                  {isPreparing && (
+                    <div className="flex items-center gap-1.5 bg-brand-gold/10 px-2 py-0.5 rounded-md">
+                      <div className="w-1.5 h-1.5 rounded-full bg-brand-gold animate-ping" />
+                      <p className="text-[10px] text-on-gold font-black uppercase tracking-wider">Cooking</p>
+                    </div>
+                  )}
+                  {isReady && (
+                    <div className="flex items-center gap-1.5 bg-brand-teal/10 px-2 py-0.5 rounded-md border border-brand-teal/20">
+                      <BellIcon size={12} className="text-[#006a67] animate-bounce" />
+                      <p className="text-[10px] text-[#006a67] font-black uppercase tracking-wider">Ready</p>
+                    </div>
+                  )}
                 </div>
-                <button onClick={() => removeFromCart(item.id)} className="text-[10px] font-black text-on-coral uppercase tracking-widest">Remove</button>
+
+                {/* Price */}
+                <div className="text-right flex-shrink-0 min-w-[60px]">
+                  <p className="text-base font-black text-on-surface">
+                    ${(item.price * item.quantity).toFixed(2)}
+                  </p>
+                </div>
+
+                {/* Individual Delete for Pending Items */}
+                {isPending && (
+                  <button 
+                    onClick={() => tableId && useTableStore.getState().updateTable(0, tableId, { orders: cart.filter((o: any) => o.cartId !== item.cartId) })}
+                    className="text-brand-coral/40 hover:text-brand-coral transition-colors"
+                  >
+                    <X size={16} strokeWidth={3} />
+                  </button>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
+
           {cart.length === 0 && (
-            <div className="flex-1 flex flex-col items-center justify-center opacity-30">
+            <div className="flex-1 flex flex-col items-center justify-center opacity-30 py-20">
               <Plus size={48} className="mb-4" />
-              <p className="font-black uppercase tracking-widest text-xs text-center">Your cart is empty<br/>Click an item to add</p>
+              <p className="font-black uppercase tracking-widest text-xs text-center leading-relaxed">
+                Click a menu item<br/>to start ordering
+              </p>
             </div>
           )}
         </div>
 
-        {/* Pricing & Actions */}
-        <div className="p-8 pt-6 border-t border-surface-container bg-white rounded-t-[32px] shadow-[0_-10px_30px_-15px_rgba(0,0,0,0.1)]">
-          <div className="space-y-3 mb-8">
-            <div className="flex justify-between text-outline text-sm font-bold">
+         {/* Pricing & Actions */}
+        <div className="p-8 pt-4 border-t border-surface-container bg-white rounded-t-[32px] shadow-[0_-10px_30px_-15px_rgba(0,0,0,0.1)]">
+          <div className="space-y-2 mb-6">
+            <div className="flex justify-between text-outline text-xs font-bold px-2">
               <span>Subtotal</span>
               <span>${subtotal.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between text-outline text-sm font-bold">
+            <div className="flex justify-between text-outline text-xs font-bold px-2">
               <span>Tax (8.5%)</span>
               <span>${tax.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between text-on-surface text-2xl font-black mt-4 pt-4 border-t border-surface-container">
+            <div className="flex justify-between text-on-surface text-xl font-black mt-2 pt-3 border-t border-surface-container px-2">
               <span>Total</span>
               <span>${total.toFixed(2)}</span>
             </div>
           </div>
 
-          <div className="flex flex-col gap-4">
-            <button className="w-full bg-brand-gold text-[#856404] py-5 rounded-2xl font-black text-base flex items-center justify-center gap-3 hover:bg-[#ffc107] transition-all active:scale-95 shadow-lg">
-              <Printer size={22} strokeWidth={2.5} />
+           <div className="flex flex-col gap-3">
+            <button 
+              onClick={() => tableId && router.push(`/checkout?table=${tableId}`)}
+              className="w-full bg-brand-gold text-[#856404] py-5 rounded-2xl font-black text-base flex items-center justify-center gap-3 hover:bg-[#ffc107] transition-all active:scale-95 shadow-lg"
+            >
+              <FileText size={22} strokeWidth={2.5} />
               Print Provisional Bill
             </button>
-            <button className="w-full bg-[#006a67] text-white py-5 rounded-2xl font-black text-base flex items-center justify-center gap-3 hover:bg-[#005a57] transition-all active:scale-95 shadow-lg">
+            <button 
+              onClick={() => tableId && confirmOrders(tableId)}
+              disabled={pendingItems.length === 0}
+              className={cn(
+               "w-full py-5 rounded-2xl font-black text-base flex items-center justify-center gap-3 transition-all active:scale-95 shadow-lg",
+               pendingItems.length > 0 ? "bg-[#006a67] text-white hover:bg-[#005a57]" : "bg-surface-container-low text-outline opacity-50 cursor-not-allowed shadow-none"
+              )}
+            >
               <SendHorizontal size={22} strokeWidth={2.5} />
-              Send to Kitchen
+              Send {pendingItems.length > 0 ? pendingItems.length : ""} to Kitchen
             </button>
           </div>
         </div>

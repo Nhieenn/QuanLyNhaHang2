@@ -14,22 +14,30 @@
 - [x] Sửa lỗi cuộn trang (Scrolling) tại màn hình Bếp.
 - [x] Hoàn thiện luồng Checkout & Thanh toán.
 - [x] Tích hợp Feedback Modal sau khi thanh toán.
+- [x] **Xây dựng Dashboard Quản lý Kho (Inventory)**: Hiển thị trạng thái tồn kho, tài sản và báo cáo lãng phí với hình ảnh chất lượng cao.
+- [x] **Đồng bộ Đặt chỗ & Sơ đồ bàn (Reservation-Map Sync)**: 
+    - Kết nối Form đặt chỗ với Store.
+    - Bổ sung UI chọn bàn trống khi đặt.
+    - Trạng thái "Reserved" (Hồng) tự động hiển thị trên sơ đồ.
+    - Luồng "Xác nhận khách đến" tự động chuyển trạng thái bàn và mở Menu gọi món.
+- [x] **Bền vững hóa dữ liệu (Persistence)**: Tích hợp LocalStorage cho `tableStore`, dữ liệu không bị mất khi Refresh trang.
 
 ## 3. Đang thực hiện (In Progress)
-- [ ] Nhánh làm việc: `feat/vietnamese-pos-overhaul` (Đã push lên GitHub).
-- [ ] Chờ Người dùng xác nhận chuẩn chức năng để Merge vào `main`.
+- [ ] Nhánh làm việc: `feature/reservation-sync-final` (Chuẩn bị push).
+- [ ] Tích hợp Gemini AI Assistant để phân tích hiệu suất phục vụ.
+- [ ] Quản lý Danh sách khách chờ (Waitlist) thực tế.
 
 ## 4. Việc tiếp theo (To-Do)
-- [ ] Xây dựng màn hình Quản lý Kho (Inventory Management).
 - [ ] Xây dựng Dashboard báo cáo doanh thu.
-- [ ] Tích hợp Gemini AI Assistant để phân tích hiệu suất phục vụ.
+- [ ] Hoàn thiện chức năng quản lý công thức (BOM Formulas).
+- [ ] Tỉ lệ quay vòng bàn (Turnover Rate) và thống kê thời gian thực.
 
 ## 5. Quyết định Kỹ thuật & Lỗi đã biết (Technical Notes & Known Issues)
-- **Cấu trúc dữ liệu:** Sử dụng `KitchenStore` (Zustand) làm trung tâm đồng bộ trạng thái món ăn giữa Bếp và Bàn.
+- **Cấu trúc dữ liệu:** Sử dụng `KitchenStore` và `TableStore` (Zustand) với Middleware `persist` để lưu trữ dữ liệu tại trình duyệt (LocalStorage).
 - **Lỗi đã fix:** 
-  - Fix crash màn hình Order do sai định dạng Props truyền vào `ProductCard`.
-  - Fix lỗi KDS bị khóa `overflow` không thể cuộn.
-  - Fix lỗi giỏ hàng bị xóa sạch sau khi gửi bếp (Giờ đây đã giữ lại lịch sử gọi món).
+  - Fix lỗi Table Map bị mất trạng thái khi Refresh trang (đã Persistence).
+  - Fix lỗi "Implicit Any" và cú pháp TypeScript trong `tableStore.ts`.
+  - Fix luồng xác nhận khách đến chưa tự động chuyển bàn sang "Occupied".
 
 ## 6. Liên kết nhanh (Quick Links)
 - [RULES.md](file:///d:/elevated-pos/RULES.md)

@@ -1,64 +1,23 @@
 "use client";
 
 import React, { useState } from "react";
-import { Plus, Users, Clock, ReceiptText, ChevronRight, Share2, Bookmark, Receipt } from "lucide-react";
+import { Plus, Users, Clock, ReceiptText, ChevronRight, Share2, Bookmark, Receipt, Minus, Hash, Bell as BellIcon, CheckCircle2, UtensilsCrossed as ChefHat } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-type TableStatus = "empty" | "occupied" | "bill-printed" | "reserved";
-
-interface Table {
-  id: string;
-  number: string;
-  status: TableStatus;
-  amount?: number;
-  guests?: number;
-  timeElapsed?: string;
-  reservedTime?: string;
-  reservedBy?: string;
-  pax?: number;
-}
+import { useRouter } from "next/navigation";
+import { useTableStore, Table, OrderItem } from "@/store/tableStore";
 
 export default function TableMapPage() {
   const [activeFloorIndex, setActiveFloorIndex] = useState(0);
   const [transferMode, setTransferMode] = useState<"none" | "source" | "target">("none");
   const [source, setSource] = useState<{ floor: number; id: string } | null>(null);
   const [target, setTarget] = useState<{ floor: number; id: string } | null>(null);
-
-  // Multi-Floor Data
-  const [floors, setFloors] = useState([
-    { 
-      name: "Main Dining Room", 
-      tables: [
-        { id: "4", number: "04", status: "occupied", guests: 3, amount: 64.5, timeElapsed: "45M" },
-        { id: "8", number: "08", status: "empty" },
-        { id: "2", number: "02", status: "bill-printed", guests: 4, amount: 120.0, timeElapsed: "1H 20M" },
-        { id: "10", number: "10", status: "reserved", pax: 4, reservedTime: "7:30 PM", reservedBy: "Smith Party" },
-        { id: "1", number: "01", status: "empty" },
-        { id: "3", number: "03", status: "occupied", guests: 2, amount: 24.0, timeElapsed: "12M" },
-        { id: "5", number: "05", status: "empty" },
-        { id: "12", number: "12", status: "empty" },
-      ] as Table[]
-    },
-    { 
-      name: "Patio Terrace", 
-      tables: [
-        { id: "21", number: "21", status: "empty" },
-        { id: "22", number: "22", status: "occupied", guests: 2, amount: 45.0, timeElapsed: "15M" },
-        { id: "23", number: "23", status: "empty" },
-        { id: "24", number: "24", status: "empty" },
-        { id: "25", number: "25", status: "empty" },
-        { id: "26", number: "26", status: "empty" },
-      ] as Table[]
-    },
-    { 
-      name: "VIP Lounge", 
-      tables: [
-        { id: "V1", number: "V1", status: "empty" },
-        { id: "V2", number: "V2", status: "occupied", guests: 6, amount: 240.0, timeElapsed: "1H" },
-        { id: "V3", number: "V3", status: "empty" },
-      ] as Table[]
-    }
-  ]);
+  
+  const { floors, updateTable, setFloors, updateItemStatus, seatReservation, reservations } = useTableStore();
+  
+  const [selectedTable, setSelectedTable] = useState<Table | null>(null);
+  const [guestCount, setGuestCount] = useState(2);
+  const [showKeypad, setShowKeypad] = useState(false);
+  const router = useRouter();
 
   const activeFloor = floors[activeFloorIndex];
 
@@ -70,7 +29,47 @@ export default function TableMapPage() {
     } else if (transferMode === "target") {
       if (table.status !== "empty") return; 
       setTarget({ floor: activeFloorIndex, id: table.id });
+    } else {
+      // Fast Path for occupied tables
+      if (table.status === "occupied" || table.status === "bill-printed") {
+        router.push(`/order-menu?table=${table.id}`);
+        return;
+      }
+      
+      // Select Guests for empty tables or Show Info for reserved tables
+      setSelectedTable(table);
+      if (table.status === "empty") {
+        setGuestCount(table.guests || 2);
+      }
     }
+  };
+
+  const handleStartServing = () => {
+    if (!selectedTable) return;
+    
+    updateTable(activeFloorIndex, selectedTable.id, {
+      status: "occupied",
+      guests: guestCount,
+      timeElapsed: "Just Started"
+    });
+    
+    setSelectedTable(null);
+    router.push(`/order-menu?table=${selectedTable.id}`);
+  };
+
+  const handleSeatReservation = () => {
+    if (!selectedTable || !selectedTable.reservationId) return;
+    
+    seatReservation(selectedTable.reservationId);
+    const tableId = selectedTable.id;
+    setSelectedTable(null);
+    router.push(`/order-menu?table=${tableId}`);
+  };
+
+  const handlePrintBill = () => {
+    if (!selectedTable) return;
+    updateTable(activeFloorIndex, selectedTable.id, { status: "bill-printed" });
+    setSelectedTable(null);
   };
 
   const executeTransfer = () => {
@@ -87,20 +86,20 @@ export default function TableMapPage() {
       const sourceTable = sFloor.tables[sourceIdx];
       const targetTable = tFloor.tables[targetIdx];
 
-      tFloor.tables[targetIdx] = { 
+      newFloors[target.floor].tables[targetIdx] = { 
         ...targetTable, 
         status: sourceTable.status, 
-        amount: sourceTable.amount,
         guests: sourceTable.guests,
-        timeElapsed: sourceTable.timeElapsed
+        timeElapsed: sourceTable.timeElapsed,
+        orders: sourceTable.orders
       };
-
+ 
       sFloor.tables[sourceIdx] = { 
         ...sourceTable, 
         status: "empty", 
-        amount: undefined, 
         guests: undefined, 
-        timeElapsed: undefined 
+        timeElapsed: undefined,
+        orders: []
       };
 
       setFloors(newFloors);
@@ -162,10 +161,10 @@ export default function TableMapPage() {
         </div>
         
         {/* Legend */}
-        <div className="flex gap-8 items-center bg-white px-8 py-5 rounded-[24px] shadow-sm border border-surface-container-low animate-in fade-in slide-in-from-right-4 duration-500">
+        <div className="flex gap-8 items-center bg-surface-container-lowest px-8 py-5 rounded-[24px] shadow-sm border border-surface-container-low animate-in fade-in slide-in-from-right-4 duration-500">
           <div className="flex items-center gap-2.5">
             <div className="w-3.5 h-3.5 rounded-full bg-[#d1d1d1]"></div>
-            <span className="text-xs font-black text-[#767775] tracking-widest">EMPTY</span>
+            <span className="text-xs font-black text-outline tracking-widest uppercase">Empty</span>
           </div>
           <div className="flex items-center gap-2.5">
             <div className="w-3.5 h-3.5 rounded-full bg-[#71f5ea]"></div>
@@ -183,7 +182,7 @@ export default function TableMapPage() {
       </div>
 
       {/* Bento-Style Table Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
         {activeFloor.tables.map((table) => (
           <div 
             key={table.id} 
@@ -204,7 +203,7 @@ export default function TableMapPage() {
 
       {/* Floor Actions Area (Bento Footer) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
-        <div className="lg:col-span-2 bg-white rounded-[32px] p-10 flex border border-surface-container-low shadow-ambient justify-between items-center">
+        <div className="lg:col-span-2 bg-surface-container-lowest rounded-[32px] p-10 flex border border-surface-container-low shadow-ambient justify-between items-center">
             <div className="flex flex-col gap-6">
                 <div>
                   <h3 className="text-2xl font-extrabold text-on-surface tracking-tight">Floor Overview</h3>
@@ -213,11 +212,11 @@ export default function TableMapPage() {
                 <div className="flex gap-4">
                     <StatBox label="TURNOVER RATE" value="1.4h" highlight />
                     <StatBox label="WAITLIST" value="4 Parties" />
-                    <StatBox label="REVENUE" value={`$${floors.reduce((acc: number, f: any) => acc + f.tables.reduce((t_acc: number, t: Table) => t_acc + (t.amount || 0), 0), 0).toLocaleString()}`} />
+                    <StatBox label="REVENUE" value={`$${floors.reduce((acc, f) => acc + f.tables.reduce((t_acc, t) => t_acc + t.orders.reduce((o_acc, o) => o_acc + (o.price * o.quantity), 0), 0), 0).toLocaleString()}`} />
                 </div>
             </div>
             
-            <div className="h-20 w-px bg-surface-container-low mx-8 hidden lg:block" />
+            <div className="h-20 w-px bg-surface-container mx-8 hidden lg:block" />
 
             <button 
               onClick={() => setTransferMode("source")}
@@ -233,9 +232,9 @@ export default function TableMapPage() {
 
         <button 
           onClick={() => setActiveFloorIndex((activeFloorIndex + 1) % floors.length)}
-          className="bg-surface-container-low rounded-[32px] p-10 border border-surface-container-low flex flex-col justify-center items-center text-center gap-4 group hover:bg-white hover:shadow-ambient transition-all active:scale-95"
+          className="bg-surface-container-low rounded-[32px] p-10 border border-surface-container-low flex flex-col justify-center items-center text-center gap-4 group hover:bg-surface-container-lowest hover:shadow-ambient transition-all active:scale-95"
         >
-          <div className="w-14 h-14 flex items-center justify-center rounded-2xl bg-white shadow-sm text-outline group-hover:text-primary transition-colors">
+          <div className="w-14 h-14 flex items-center justify-center rounded-2xl bg-surface-container-lowest shadow-sm text-outline group-hover:text-primary transition-colors">
             <Share2 size={32} strokeWidth={2.5} />
           </div>
           <div>
@@ -253,11 +252,214 @@ export default function TableMapPage() {
         </button>
       </div>
 
-      {/* FAB */}
-      <button className="fixed bottom-10 right-10 w-20 h-20 bg-primary text-white rounded-full shadow-2xl flex items-center justify-center group active:scale-90 transition-transform z-50">
-        <Plus size={40} strokeWidth={3} className="group-hover:scale-110 transition-transform" />
-      </button>
+      {/* FAB - Quick Takeaway */}
+      <div className="fixed bottom-10 right-10 flex flex-col items-end gap-3 z-50">
+        <div className="bg-primary text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg animate-in fade-in slide-in-from-right-4 duration-500 delay-500">
+          Quick Takeaway
+        </div>
+        <button 
+          onClick={() => router.push('/order-menu?table=TAKEAWAY')}
+          className="w-20 h-20 bg-primary text-white rounded-full shadow-2xl flex items-center justify-center group active:scale-90 transition-transform"
+        >
+          <Plus size={40} strokeWidth={3} className="group-hover:scale-110 transition-transform" />
+        </button>
+      </div>
+
+      {/* Dynamic Interaction Modals */}
+      {selectedTable && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center animate-in fade-in duration-500 p-4">
+          <div 
+            className="absolute inset-0 bg-on-surface/50 backdrop-blur-xl transition-all duration-700" 
+            onClick={() => setSelectedTable(null)} 
+          />
+          
+          <div className="relative w-full max-w-[500px] bg-surface-container-lowest/95 backdrop-blur-md rounded-[48px] p-12 shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-10 duration-500 ease-out fill-mode-both">
+            <button 
+              onClick={() => setSelectedTable(null)}
+              className="absolute top-8 right-8 w-12 h-12 rounded-full bg-surface-container-low flex items-center justify-center text-outline hover:text-on-surface hover:rotate-90 transition-all duration-300"
+            >
+              <X size={24} />
+            </button>
+
+            {selectedTable.status === "reserved" ? (
+               <div className="flex flex-col items-center">
+                  <div className="w-20 h-20 bg-brand-coral/20 text-on-coral rounded-full flex items-center justify-center mb-8 animate-in zoom-in-50 delay-150 duration-500">
+                    <Bookmark size={40} fill="currentColor" />
+                  </div>
+                  <h3 className="text-4xl font-black text-on-surface text-center mb-2 tracking-tighter">Table {selectedTable.number}</h3>
+                  <div className="bg-brand-coral/10 px-4 py-1 rounded-full text-[10px] font-black text-on-coral uppercase tracking-widest mb-8">
+                     Reserved Booking
+                  </div>
+
+                  <div className="w-full bg-surface-container-low rounded-3xl p-8 mb-10 space-y-6">
+                    <div className="flex justify-between items-center text-on-surface">
+                       <span className="text-[10px] font-black text-outline uppercase tracking-widest">Guest Name</span>
+                       <span className="text-xl font-black">{selectedTable.reservedBy || "Unknown Guest"}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-on-surface">
+                       <span className="text-[10px] font-black text-outline uppercase tracking-widest">Time & Pax</span>
+                       <span className="text-xl font-black">{selectedTable.reservedTime} • {selectedTable.pax} Guests</span>
+                    </div>
+                  </div>
+
+                  <div className="w-full flex flex-col gap-4">
+                    <button 
+                     onClick={handleSeatReservation}
+                     className="w-full py-6 bg-primary text-white rounded-[24px] font-black text-lg shadow-xl hover:shadow-primary/30 active:scale-95 transition-all duration-300 flex items-center justify-center gap-3 group"
+                    >
+                      <CheckCircle2 size={24} />
+                      Confirm Guest Arrival
+                    </button>
+                    <button 
+                     onClick={() => setSelectedTable(null)}
+                     className="w-full py-5 text-outline font-black text-[10px] uppercase tracking-[0.25em] hover:text-on-surface transition-colors"
+                    >
+                      Keep reserved
+                    </button>
+                  </div>
+               </div>
+            ) : selectedTable.status === "empty" && (
+              <div className="flex flex-col items-center">
+                <div className="w-20 h-20 bg-primary-container text-primary rounded-full flex items-center justify-center mb-8 animate-in zoom-in-50 delay-150 duration-500">
+                  <Users size={40} />
+                </div>
+                <h3 className="text-4xl font-black text-on-surface text-center mb-2 tracking-tighter animate-in fade-in slide-in-from-top-4 delay-200 duration-500">Table {selectedTable.number}</h3>
+                <p className="text-sm font-bold text-outline text-center mb-10 animate-in fade-in slide-in-from-top-4 delay-300 duration-500">Assign guests to start a new dining session.</p>
+                
+                <div className="w-full space-y-8 mb-12 animate-in fade-in slide-in-from-bottom-8 delay-400 duration-700">
+                   {!showKeypad ? (
+                     <>
+                        <div className="flex justify-between items-center bg-surface-container-low rounded-[32px] p-4 pr-10">
+                           <button 
+                             onClick={() => setGuestCount(Math.max(1, guestCount - 1))}
+                             className="w-16 h-16 rounded-2xl bg-surface-container-lowest shadow-sm flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all active:scale-95"
+                           >
+                             <Minus size={28} strokeWidth={3} />
+                           </button>
+                           
+                           <button 
+                             onClick={() => setShowKeypad(true)}
+                             className="flex flex-col items-center group"
+                           >
+                             <span className="text-6xl font-black text-on-surface tracking-tighter group-hover:scale-110 transition-transform">{guestCount}</span>
+                             <span className="text-[10px] font-black text-primary uppercase tracking-widest mt-1 opacity-0 group-hover:opacity-100 transition-opacity">Tap to type</span>
+                           </button>
+
+                           <button 
+                             onClick={() => setGuestCount(guestCount + 1)}
+                             className="w-16 h-16 rounded-2xl bg-surface-container-lowest shadow-sm flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all active:scale-95"
+                           >
+                             <Plus size={28} strokeWidth={3} />
+                           </button>
+                        </div>
+                        <div className="grid grid-cols-5 gap-3">
+                           {[2, 4, 6, 10, 12].map((n) => (
+                             <button 
+                               key={n}
+                               onClick={() => setGuestCount(n)}
+                               className={cn(
+                                 "h-12 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all",
+                                 guestCount === n ? "bg-primary text-white shadow-md scale-105" : "bg-surface-container-low text-outline hover:bg-surface-container-highest"
+                               )}
+                             >
+                               {n} PAX
+                             </button>
+                           ))}
+                           <button 
+                            onClick={() => setShowKeypad(true)}
+                            className="h-12 bg-primary-container text-primary rounded-xl flex items-center justify-center hover:bg-primary hover:text-white transition-all"
+                           >
+                             <Hash size={18} strokeWidth={3} />
+                           </button>
+                        </div>
+                     </>
+                   ) : (
+                     <div className="animate-in zoom-in-95 duration-300">
+                        <div className="grid grid-cols-3 gap-3 mb-4">
+                           {[1, 2, 3, 4, 5, 6, 7, 8, 9, 0].map((num) => (
+                             <button 
+                               key={num}
+                               onClick={() => {
+                                 const newVal = parseInt(`${guestCount}${num}`);
+                                 if (newVal <= 99) setGuestCount(newVal);
+                               }}
+                               className="h-14 bg-surface-container-low rounded-2xl font-black text-xl hover:bg-surface-container-highest active:scale-95 transition-all"
+                             >
+                               {num}
+                             </button>
+                           ))}
+                           <button 
+                             onClick={() => setGuestCount(Math.floor(guestCount / 10))}
+                             className="h-14 bg-surface-container-low text-brand-coral rounded-2xl flex items-center justify-center hover:bg-brand-coral/10 transition-all font-black"
+                           >
+                             DEL
+                           </button>
+                           <button 
+                             onClick={() => setShowKeypad(false)}
+                             className="h-14 bg-primary-container text-primary rounded-2xl flex items-center justify-center hover:bg-primary hover:text-white transition-all font-black text-xs uppercase tracking-widest"
+                           >
+                             OK
+                           </button>
+                        </div>
+                        <div className="flex justify-between items-center py-2 px-4 bg-surface-container-low rounded-2xl">
+                           <span className="text-[10px] font-black text-outline uppercase tracking-widest">Entry Mode</span>
+                           <span className="text-lg font-black text-primary">{guestCount} PAXS</span>
+                        </div>
+                     </div>
+                   )}
+                </div>
+
+                <div className="w-full flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-8 delay-500 duration-700">
+                   <button 
+                    onClick={handleStartServing}
+                    className="w-full py-6 bg-primary text-white rounded-[24px] font-black text-lg shadow-xl hover:shadow-primary/30 active:scale-95 transition-all duration-300 flex items-center justify-center gap-3 group"
+                   >
+                     <ReceiptText size={24} className="group-hover:rotate-12 transition-transform" />
+                     Assign & Open Menu
+                   </button>
+                   <button 
+                    onClick={() => setSelectedTable(null)}
+                    className="w-full py-5 text-outline font-black text-[10px] uppercase tracking-[0.25em] hover:text-on-surface transition-colors"
+                   >
+                     Cancel seating
+                   </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+function ActionButton({ icon: Icon, label, onClick }: { icon: any; label: string; onClick?: () => void }) {
+  return (
+    <button onClick={onClick} className="flex flex-col items-center gap-3 group w-full">
+      <div className="w-16 h-16 rounded-[24px] bg-white shadow-ambient flex items-center justify-center text-outline group-hover:bg-primary group-hover:text-white group-hover:scale-110 transition-all duration-300">
+        <Icon size={28} />
+      </div>
+      <span className="text-[10px] font-black uppercase tracking-widest text-outline group-hover:text-on-surface">{label}</span>
+    </button>
+  );
+}
+
+function X({ size, className }: { size?: number; className?: string }) {
+  return (
+    <svg 
+      width={size || 24} 
+      height={size || 24} 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="3" 
+      strokeLinecap="round" 
+      strokeLinejoin="round" 
+      className={className}
+    >
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
   );
 }
 
@@ -266,40 +468,50 @@ function TableCard({ table }: { table: Table }) {
   const isBillPrinted = table.status === "bill-printed";
   const isReserved = table.status === "reserved";
   const isEmpty = table.status === "empty";
+  
+  const totalAmount = table.orders.reduce((acc, o) => acc + (o.price * o.quantity), 0);
+  const isFoodReady = table.orders.some(o => o.status === "ready");
+  const isPreparing = table.orders.some(o => o.status === "preparing") && !isFoodReady;
 
   return (
     <div 
       className={cn(
         "min-w-[216px] min-h-[152px] rounded-xl p-6 flex flex-col justify-between transition-all relative cursor-pointer group active:scale-95 shadow-ambient",
-        isEmpty && "bg-white border-2 border-dashed border-[#767775] shadow-none",
+        isEmpty && "bg-white border-2 border-dashed border-outline/30 shadow-none",
         isOccupied && "bg-primary-container",
         isBillPrinted && "bg-brand-gold",
-        isReserved && "bg-brand-coral"
+        isReserved && "bg-brand-coral",
+        isFoodReady && "ring-4 ring-white ring-offset-2 ring-offset-brand-emerald animate-pulse",
+        isPreparing && "ring-2 ring-primary/30 ring-offset-2 ring-offset-surface-container-low"
       )}
     >
+      {/* Ready Notification Icon */}
+      {isFoodReady && (
+        <div className="absolute top-4 right-4 text-white animate-bounce z-20">
+          <BellIcon size={24} fill="currentColor" />
+        </div>
+      )}
       {isReserved && <Bookmark size={24} className="absolute top-6 right-6 text-on-coral" fill="currentColor" />}
       
-      <div className="flex justify-between items-start">
-        <div>
-          <span className={cn(
-            "text-[10px] font-black tracking-widest uppercase block mb-0.5",
-            isOccupied && "text-primary/70",
-            isBillPrinted && "text-on-gold/80",
-            isReserved && "text-on-coral/70",
-            isEmpty && "text-outline"
-          )}>Table</span>
-          <span className={cn(
-            "text-4xl font-black block tracking-tight",
-            isOccupied && "text-primary",
-            isBillPrinted && "text-on-gold",
-            isReserved && "text-on-coral",
-            isEmpty && "text-surface-container-highest group-hover:text-primary transition-colors"
-          )}>{table.number}</span>
+      {/* Preparing Icon */}
+      {isPreparing && (
+        <div className="absolute top-4 right-4 text-primary/30 animate-pulse">
+          <ChefHat size={24} />
         </div>
+      )}
+      
+      <div className="flex justify-between items-start">
+        <span className={cn(
+          "text-3xl font-black transition-colors",
+          isOccupied && "text-primary",
+          isBillPrinted && "text-on-gold",
+          isReserved && "text-on-coral",
+          isEmpty && "text-outline"
+        )}>{table.number}</span>
         
         {table.timeElapsed && (
           <div className={cn(
-            "px-3 py-1 rounded-full text-[10px] font-black",
+            "px-2 py-0.5 rounded-md text-[10px] font-bold",
             isOccupied ? "bg-primary text-white" : "bg-on-gold text-brand-gold"
           )}>
             {table.timeElapsed}
@@ -309,42 +521,29 @@ function TableCard({ table }: { table: Table }) {
 
       <div className="flex flex-col gap-0.5">
         {isReserved ? (
-          <>
-            <p className="text-sm font-bold text-on-coral uppercase tracking-wide">Reserved</p>
-            <p className="text-2xl font-black text-on-coral mt-1 leading-none">{table.reservedTime}</p>
-            <p className="text-xs font-medium text-on-coral/70 mt-1">{table.reservedBy} • {table.pax} pax</p>
-          </>
+          <div>
+            <p className="text-[10px] font-bold text-on-coral/70 uppercase">Reserved</p>
+            <p className="text-lg font-black text-on-coral">{table.reservedTime}</p>
+          </div>
         ) : isEmpty ? (
-          <>
-             <div className="flex justify-center flex-1">
-                <Plus size={36} className="text-surface-container-highest group-hover:text-primary transition-colors" strokeWidth={3} />
-             </div>
-             <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                <p className="text-[10px] font-black text-primary text-center tracking-widest uppercase">Tap to Seat</p>
-             </div>
-          </>
+          <div className="flex justify-center opacity-40 group-hover:opacity-100 transition-opacity">
+            <Plus size={24} />
+          </div>
         ) : (
-          <>
-            <div className="flex items-center gap-2 mb-1">
-              {isBillPrinted && <Receipt size={20} className="text-on-gold" />}
+          <div>
+            <div className="flex items-center gap-1">
               <p className={cn(
-                "text-2xl font-black leading-none",
+                "text-xl font-black",
                 isOccupied ? "text-primary" : "text-on-gold"
-              )}>${table.amount?.toFixed(2)}</p>
+              )}>${totalAmount.toFixed(2)}</p>
             </div>
-            
-            <div className="flex items-center gap-4 mt-1">
-              {table.guests && (
-                <div className="flex items-center gap-1.5">
-                  <Users size={14} className={cn(isOccupied ? "text-primary/70" : "text-on-gold/70")} />
-                  <span className={cn("text-xs font-medium", isOccupied ? "text-primary/70" : "text-on-gold/70")}>{table.guests} Guests</span>
-                </div>
-              )}
-              {isBillPrinted && (
-                 <span className="text-[10px] font-bold text-on-gold/80 uppercase tracking-widest">Awaiting Payment</span>
-              )}
-            </div>
-          </>
+            {table.guests && (
+              <div className="flex items-center gap-1 mt-0.5">
+                <Users size={12} className={cn(isOccupied ? "text-primary/60" : "text-on-gold/60")} />
+                <span className={cn("text-[10px] font-bold", isOccupied ? "text-primary/60" : "text-on-gold/60")}>{table.guests} Guests</span>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

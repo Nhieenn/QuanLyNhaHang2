@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme inline {
-  /* Definitive Brand Palette - From Figma Inspect */
+  /* Definitive Brand Palette - Elevated Organic Style */
   --color-primary: #006760; 
   --color-primary-container: #73f1e4; 
   --color-on-primary-container: #005852;
@@ -31,7 +31,7 @@
 
   /* Spacing / Radii */
   --radius-md: 0.75rem; /* 12px */
-  --radius-xl: 1rem; /* 16px - Refined for W216 H152 */
+  --radius-xl: 1rem; /* 16px */
 }
 
 :root {
@@ -51,7 +51,7 @@ h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
 }
 
-/* The "No-Line" Rule: Borders are prohibited for sectioning. Use background shifts. */
+/* Sectioning without borders */
 .no-border-section {
   border: none !important;
 }

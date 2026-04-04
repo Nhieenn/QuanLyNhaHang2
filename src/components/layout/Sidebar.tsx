@@ -3,6 +3,10 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useUserStore } from "@/store/userStore";
+import { useSettingsStore } from "@/store/settingsStore";
+import { translations } from "@/lib/translations";
+
 /* Custom High-Fidelity Icons to match Figma Figure 5 */
 const TableMapIcon = ({ className, size = 24, strokeWidth = 2.5 }: { className?: string; size?: number; strokeWidth?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -34,24 +38,27 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const menuItems = [
-  { name: "Table Map", href: "/table-map", icon: TableMapIcon },
-  { name: "Reservations", href: "/reservations", icon: Calendar },
-  { name: "Order Menu", href: "/order-menu", icon: UtensilsCrossed },
-  { name: "Kitchen KDS", href: "/kitchen-kds", icon: KitchenIcon },
-  { name: "Checkout", href: "/checkout", icon: Banknote },
-  { name: "Feedback", href: "/feedback", icon: SquarePen },
-  { name: "Inventory", href: "/inventory", icon: Package },
-];
-
 export function Sidebar() {
   const pathname = usePathname();
+  const { currentUser } = useUserStore();
+  const { language } = useSettingsStore();
+  const t = translations[language].sidebar;
+
+  const menuItems = [
+    { name: t.tableMap, href: "/table-map", icon: TableMapIcon },
+    { name: t.reservations, href: "/reservations", icon: Calendar },
+    { name: t.orderMenu, href: "/order-menu", icon: UtensilsCrossed },
+    { name: t.kitchenKds, href: "/kitchen-kds", icon: KitchenIcon },
+    { name: t.checkout, href: "/checkout", icon: Banknote },
+    { name: t.feedback, href: "/feedback", icon: SquarePen },
+    { name: t.inventory, href: "/inventory", icon: Package },
+  ];
 
   return (
     <aside className="w-[240px] h-screen fixed left-0 top-0 bg-surface-container flex flex-col py-10 z-50 no-border-section">
       <div className="px-8 mb-4">
         <h1 className="text-lg font-black text-on-surface tracking-tight">Elevated POS</h1>
-        <p className="text-xs text-outline font-medium mt-1">Staff: Alex</p>
+        <p className="text-xs text-outline font-medium mt-1">{t.staff}: {currentUser?.name || "Guest"}</p>
       </div>
 
       <nav className="flex flex-col gap-2 mt-4">
@@ -65,7 +72,7 @@ export function Sidebar() {
               className={cn(
                 "mx-3 flex items-center gap-4 px-6 py-4 rounded-full transition-all duration-200 group",
                 isActive 
-                  ? "bg-[#71f5ea] text-[#006a67] shadow-sm" 
+                  ? "bg-primary-container text-on-primary-container shadow-sm" 
                   : "text-on-surface hover:bg-surface-container-highest"
               )}
             >
@@ -87,8 +94,6 @@ export function Sidebar() {
           );
         })}
       </nav>
-
-      {/* Footer info removed to match Figma */}
     </aside>
   );
 }
