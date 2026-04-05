@@ -5,14 +5,18 @@ import { useRouter } from "next/navigation";
 import { PinPad } from "@/components/auth/PinPad";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { useUserStore } from "@/store/userStore";
+import { useSettingsStore } from "@/store/settingsStore";
+import { translations } from "@/lib/translations";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useUserStore();
+  const { login, loading } = useUserStore();
+  const { language } = useSettingsStore();
   const [error, setError] = useState(false);
+  const t = translations[language];
 
-  const handleLogin = (pin: string) => {
-    const success = login(pin);
+  const handleLogin = async (pin: string) => {
+    const success = await login(pin);
     if (success) {
       router.push("/table-map");
     } else {
@@ -38,14 +42,14 @@ export default function LoginPage() {
             <PinPad 
                 onSuccess={handleLogin}
                 error={error}
-                title="Staff Login"
-                subtitle="Please enter your 4-digit staff access code to start the service"
+                title={t.loginPage.title}
+                subtitle={t.loginPage.subtitle}
             />
         </div>
 
         {/* Branding Footer */}
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 text-center opacity-30">
-            <p className="text-[10px] font-black uppercase tracking-[0.5em] text-on-surface">The Elevated Organic POS System</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.5em] text-on-surface">{t.loginPage.branding}</p>
         </div>
       </main>
     </div>

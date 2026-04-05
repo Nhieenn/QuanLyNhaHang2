@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { 
   Star, 
@@ -20,28 +20,27 @@ import {
   Circle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSettingsStore } from "@/store/settingsStore";
+import { translations } from "@/lib/translations";
+import { useFeedbackStore } from "@/store/feedbackStore";
+import { HistoryModal } from "@/components/feedback/HistoryModal";
 
-interface FeedbackEntry {
-  id: string;
-  source: string;
-  author: string;
-  rating: number;
-  time: string;
-  comment?: string;
-}
-
-const RECENT_FEEDBACK: FeedbackEntry[] = [
-  { id: "f1", source: "Table 12", author: "Sarah J.", rating: 4, time: "10 minutes ago" },
-  { id: "f2", source: "Table 4", author: "Mark W.", rating: 5, time: "25 minutes ago" },
-  { id: "f3", source: "Takeaway 102", author: "Emily R.", rating: 5, time: "40 minutes ago" },
-  { id: "f4", source: "Table 18", author: "Davit K.", rating: 3, time: "1 hour ago" }
-];
+// Removed static mockup
 
 export default function FeedbackPage() {
+  const { language } = useSettingsStore();
+  const t = translations[language].feedbackPage;
+  
+  const { feedbacks, addFeedback, getAverageRating } = useFeedbackStore();
+  const recentFeedbacks = feedbacks.slice(0, 4);
+
   const searchParams = useSearchParams();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedStars, setSelectedStars] = useState(0);
   const [hoverStars, setHoverStars] = useState(0);
+  const [customerName, setCustomerName] = useState("");
+  const [comment, setComment] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
 
   // Tự động mở Modal nếu có tham số showRating=true từ trang Checkout chuyển sang
@@ -63,11 +62,19 @@ export default function FeedbackPage() {
   };
 
   const handleSubmit = () => {
+    addFeedback({
+      source: `Bàn 12`, // Hardcoded for demo
+      author: customerName.trim() || t.modal.anonymous,
+      rating: selectedStars,
+      comment: comment
+    });
     setIsSubmitted(true);
     setTimeout(() => {
       setIsSubmitted(false);
       setIsModalOpen(false);
       setSelectedStars(0);
+      setComment("");
+      setCustomerName("");
     }, 2000);
   };
 
@@ -77,25 +84,25 @@ export default function FeedbackPage() {
       {/* Header */}
       <div className="flex justify-between items-end">
         <div>
-          <h2 className="text-4xl font-black text-on-surface tracking-tight leading-none mb-2">Feedback History</h2>
-          <p className="text-sm font-bold text-outline tracking-tight">Reviewing recent guest submissions for today.</p>
+          <h2 className="text-4xl font-black text-on-surface tracking-tight leading-none mb-2">{t.title}</h2>
+          <p className="text-sm font-bold text-outline tracking-tight">{t.subtitle}</p>
         </div>
         <button 
           onClick={() => setIsModalOpen(true)}
           className="bg-[#006a67] text-white px-6 py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center gap-2 shadow-lg hover:bg-[#005a57] transition-all"
         >
           <Plus size={20} />
-          New Feedback
+          {t.newFeedback}
         </button>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-10">
         {/* Left: Recent Ratings */}
         <div className="flex-1 bg-white rounded-[40px] p-10 shadow-ambient border border-surface-container-low min-h-[500px]">
-          <h3 className="text-xl font-black text-on-surface mb-8">Recent Ratings</h3>
+          <h3 className="text-xl font-black text-on-surface mb-8">{t.recentRatings}</h3>
           
           <div className="space-y-4">
-            {RECENT_FEEDBACK.map((entry) => (
+            {recentFeedbacks.map((entry) => (
               <div key={entry.id} className="bg-surface-container-low/50 rounded-3xl p-6 flex items-center justify-between group hover:bg-white hover:shadow-md transition-all cursor-pointer border border-transparent hover:border-surface-container">
                 <div className="flex items-center gap-6">
                   <div className="w-14 h-14 rounded-2xl bg-brand-teal/20 text-[#006a67] flex items-center justify-center shadow-sm">
@@ -125,32 +132,35 @@ export default function FeedbackPage() {
             ))}
           </div>
 
-          <button className="w-full mt-10 py-5 rounded-2xl bg-surface-container-low text-outline font-black text-xs uppercase tracking-widest hover:text-on-surface transition-colors">
-            View All History
+          <button 
+            onClick={() => setIsHistoryOpen(true)}
+            className="w-full mt-10 py-5 rounded-2xl bg-surface-container-low text-outline font-black text-xs uppercase tracking-widest hover:text-on-surface transition-colors"
+          >
+            {t.viewAllHistory}
           </button>
         </div>
 
         {/* Right: Stats */}
         <div className="w-full lg:w-[400px] flex flex-col gap-6">
           <div className="bg-white rounded-[40px] p-10 shadow-ambient border border-surface-container-low flex flex-col items-center justify-center text-center">
-            <span className="text-[10px] font-black text-outline uppercase tracking-[0.25em] mb-4">TODAY'S SCORE</span>
-            <div className="text-8xl font-black text-[#006a67] tracking-tighter mb-2">4.8</div>
-            <h4 className="text-xl font-black text-on-surface mb-2">Average Rating</h4>
+            <span className="text-[10px] font-black text-outline uppercase tracking-[0.25em] mb-4">{t.todayScore}</span>
+            <div className="text-8xl font-black text-[#006a67] tracking-tighter mb-2">{getAverageRating()}</div>
+            <h4 className="text-xl font-black text-on-surface mb-2">{t.averageRating}</h4>
             <div className="flex items-center gap-2 px-4 py-2 bg-brand-gold/10 text-brand-gold rounded-full font-bold text-xs">
               <ArrowUpRight size={14} />
-              +0.2 from yesterday
+              +0.2 {t.yesterdayTrend}
             </div>
-            <p className="text-xs text-outline font-bold mt-6">Based on 124 reviews today</p>
+            <p className="text-xs text-outline font-bold mt-6">{t.reviewsCount.replace("{n}", feedbacks.length.toString())}</p>
           </div>
 
           <div className="bg-white rounded-[40px] p-10 shadow-ambient border border-surface-container-low">
              <div className="flex items-center justify-between mb-8">
-               <h4 className="text-lg font-black text-on-surface">Review Channels</h4>
+               <h4 className="text-lg font-black text-on-surface">{t.channelsTitle}</h4>
                <Users size={20} className="text-outline" />
              </div>
              <div className="space-y-6">
-                <ChannelStat label="Dine-in" value={88} percentage={72} />
-                <ChannelStat label="Takeaway" value={36} percentage={28} />
+                <ChannelStat label={t.dineIn} value={88} percentage={72} unit={t.reviewsUnit} />
+                <ChannelStat label={t.takeaway} value={36} percentage={28} unit={t.reviewsUnit} />
              </div>
           </div>
         </div>
@@ -167,8 +177,8 @@ export default function FeedbackPage() {
                   <div className="w-24 h-24 bg-brand-teal rounded-full flex items-center justify-center text-[#006a67] shadow-xl mb-8">
                     <CheckCircle2 size={48} />
                   </div>
-                  <h3 className="text-3xl font-black text-on-surface">Thank You!</h3>
-                  <p className="text-outline mt-2 font-bold">Your feedback has been recorded.</p>
+                  <h3 className="text-3xl font-black text-on-surface">{t.modal.successTitle}</h3>
+                  <p className="text-outline mt-2 font-bold">{t.modal.successSubtitle}</p>
                </div>
             ) : (
               <>
@@ -183,8 +193,15 @@ export default function FeedbackPage() {
                   {getRatingIcon(hoverStars || selectedStars, 40)}
                 </div>
                 
-                <h3 className="text-3xl font-black text-on-surface text-center mb-2">How was your experience?</h3>
-                <p className="text-sm font-bold text-outline text-center mb-10">Your feedback helps us grow and serve you better.</p>
+                <h3 className="text-3xl font-black text-on-surface text-center mb-2">{t.modal.title}</h3>
+                <p className={cn(
+                  "text-sm font-bold text-center mb-10 transition-colors duration-300",
+                  (hoverStars || selectedStars) > 0 && (hoverStars || selectedStars) <= 2 ? "text-brand-orange" : "text-outline"
+                )}>
+                  {(hoverStars || selectedStars) > 0 && (hoverStars || selectedStars) <= 2 
+                    ? t.modal.lowRatingMessage 
+                    : t.modal.subtitle}
+                </p>
                 
                 {/* Star Interaction */}
                 <div className="flex gap-4 mb-10">
@@ -211,11 +228,24 @@ export default function FeedbackPage() {
                   ))}
                 </div>
 
+                <div className="w-full space-y-4 mb-4">
+                  <span className="text-[10px] font-black text-outline uppercase tracking-widest pl-2">{t.modal.fullName}</span>
+                  <input 
+                    type="text"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    placeholder="VD: Nguyễn Văn A..."
+                    className="w-full bg-surface-container-low rounded-2xl p-4 text-on-surface font-sans text-sm focus:outline-none focus:ring-4 focus:ring-brand-teal/20 transition-all"
+                  />
+                </div>
+
                 <div className="w-full space-y-4 mb-10">
-                  <span className="text-[10px] font-black text-outline uppercase tracking-widest pl-2">SHARE YOUR THOUGHTS</span>
+                  <span className="text-[10px] font-black text-outline uppercase tracking-widest pl-2">{t.modal.shareThoughts}</span>
                   <textarea 
-                    placeholder="Tell us more about your visit..."
-                    className="w-full h-40 bg-surface-container-low rounded-[32px] p-6 text-on-surface font-sans text-sm focus:outline-none focus:ring-4 focus:ring-brand-teal/20 placeholder:text-outline/50 resize-none transition-all"
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    placeholder={t.modal.placeholder}
+                    className="w-full h-32 bg-surface-container-low rounded-[32px] p-6 text-on-surface font-sans text-sm focus:outline-none focus:ring-4 focus:ring-brand-teal/20 placeholder:text-outline/50 resize-none transition-all"
                   />
                 </div>
 
@@ -229,30 +259,36 @@ export default function FeedbackPage() {
                       : "bg-surface-container-highest text-white/50 cursor-not-allowed"
                   )}
                 >
-                  Submit Feedback
+                  {t.modal.submitBtn}
                 </button>
                 
                 <button 
                   onClick={() => setIsModalOpen(false)}
                   className="mt-6 text-xs font-black text-outline hover:text-on-surface transition-colors p-2"
                 >
-                  Skip for now
+                  {t.modal.skipBtn}
                 </button>
               </>
             )}
           </div>
         </div>
       )}
+
+      {/* History Modal Popup */}
+      <HistoryModal 
+        isOpen={isHistoryOpen} 
+        onClose={() => setIsHistoryOpen(false)} 
+      />
     </div>
   );
 }
 
-function ChannelStat({ label, value, percentage }: { label: string; value: number; percentage: number }) {
+function ChannelStat({ label, value, percentage, unit }: { label: string; value: number; percentage: number; unit: string }) {
   return (
     <div className="space-y-2">
       <div className="flex justify-between items-baseline">
         <span className="text-base font-black text-on-surface">{label}</span>
-        <span className="text-sm font-bold text-outline">{value} reviews</span>
+        <span className="text-sm font-bold text-outline">{value} {unit}</span>
       </div>
       <div className="w-full h-3 bg-surface-container-low rounded-full overflow-hidden">
         <div 

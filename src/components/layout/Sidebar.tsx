@@ -34,7 +34,9 @@ import {
   UtensilsCrossed, 
   Banknote, 
   SquarePen, 
-  Package 
+  Package,
+  BarChart3,
+  Users
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -52,6 +54,8 @@ export function Sidebar() {
     { name: t.checkout, href: "/checkout", icon: Banknote },
     { name: t.feedback, href: "/feedback", icon: SquarePen },
     { name: t.inventory, href: "/inventory", icon: Package },
+    { name: t.reports, href: "/reports", icon: BarChart3 },
+    { name: t.staff, href: "/staff", icon: Users },
   ];
 
   return (

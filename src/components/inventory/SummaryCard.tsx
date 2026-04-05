@@ -3,6 +3,8 @@
 import React from "react";
 import { AlertCircle, TrendingDown, DollarSign } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSettingsStore } from "@/store/settingsStore";
+import { translations } from "@/lib/translations";
 
 interface SummaryCardProps {
   type: "low-stock" | "assets" | "wastage";
@@ -14,6 +16,9 @@ interface SummaryCardProps {
 }
 
 export function SummaryCard({ type, value, label, subtitle, actionLabel, onAction }: SummaryCardProps) {
+  const { language } = useSettingsStore();
+  const t = translations[language].inventoryPage;
+
   const isLowStock = type === "low-stock";
   const isAssets = type === "assets";
   const isWastage = type === "wastage";
@@ -42,12 +47,12 @@ export function SummaryCard({ type, value, label, subtitle, actionLabel, onActio
         
         {isLowStock && (
           <span className="text-[10px] font-black uppercase tracking-widest bg-white/20 px-3 py-1 rounded-full">
-            Urgent
+            {t.criticalStock}
           </span>
         )}
         {isAssets && (
           <span className="text-[10px] font-black uppercase tracking-widest text-outline">
-            Total Value
+            {t.currentAssets}
           </span>
         )}
       </div>

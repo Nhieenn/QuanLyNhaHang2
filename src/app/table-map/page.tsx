@@ -5,6 +5,8 @@ import { Plus, Users, Clock, ReceiptText, ChevronRight, Share2, Bookmark, Receip
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { useTableStore, Table, OrderItem } from "@/store/tableStore";
+import { useSettingsStore } from "@/store/settingsStore";
+import { translations } from "@/lib/translations";
 
 export default function TableMapPage() {
   const [activeFloorIndex, setActiveFloorIndex] = useState(0);
@@ -12,23 +14,47 @@ export default function TableMapPage() {
   const [source, setSource] = useState<{ floor: number; id: string } | null>(null);
   const [target, setTarget] = useState<{ floor: number; id: string } | null>(null);
   
-  const { floors, updateTable, setFloors, updateItemStatus, seatReservation, reservations } = useTableStore();
+  const { floors, updateTable, setFloors, updateItemStatus, seatReservation, reservations, transferTable } = useTableStore();
+  const { language } = useSettingsStore();
+  const t = translations[language].tableMapPage;
+  const commonT = translations[language].common;
+
+  // Helper to get localized floor name (handles legacy data without ID)
+  const getFloorName = (floor: any) => {
+    if (floor.id && (t.floors as any)[floor.id]) {
+      return (t.floors as any)[floor.id];
+    }
+    // Fallback mapping by name for legacy data
+    const nameMap: Record<string, string> = {
+      "Main Dining Room": (t.floors as any).main,
+      "Patio Terrace": (t.floors as any).patio,
+      "VIP Lounge": (t.floors as any).vip,
+      "Direct Orders": (t.floors as any).takeaway
+    };
+    return nameMap[floor.name] || floor.name;
+  };
   
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [guestCount, setGuestCount] = useState(2);
   const [showKeypad, setShowKeypad] = useState(false);
   const router = useRouter();
 
-  const activeFloor = floors[activeFloorIndex];
+  // Safety: If loading or no floors, show loading or empty state
+  const { loading } = useTableStore();
+  const activeFloor = floors && floors.length > 0 ? floors[activeFloorIndex] : null;
 
   const handleTableClick = (table: Table) => {
+    if (!activeFloor) return;
     if (transferMode === "source") {
       if (table.status === "empty") return; 
       setSource({ floor: activeFloorIndex, id: table.id });
       setTransferMode("target");
     } else if (transferMode === "target") {
       if (table.status !== "empty") return; 
-      setTarget({ floor: activeFloorIndex, id: table.id });
+      if (source) {
+        transferTable(source.floor, source.id, table.id);
+        cancelTransfer();
+      }
     } else {
       // Fast Path for occupied tables
       if (table.status === "occupied" || table.status === "bill-printed") {
@@ -45,7 +71,7 @@ export default function TableMapPage() {
   };
 
   const handleStartServing = () => {
-    if (!selectedTable) return;
+    if (!selectedTable || !activeFloor) return;
     
     updateTable(activeFloorIndex, selectedTable.id, {
       status: "occupied",
@@ -72,46 +98,33 @@ export default function TableMapPage() {
     setSelectedTable(null);
   };
 
-  const executeTransfer = () => {
-    if (!source || !target) return;
-
-    const newFloors = [...floors];
-    const sFloor = newFloors[source.floor];
-    const tFloor = newFloors[target.floor];
-
-    const sourceIdx = sFloor.tables.findIndex(t => t.id === source.id);
-    const targetIdx = tFloor.tables.findIndex(t => t.id === target.id);
-
-    if (sourceIdx !== -1 && targetIdx !== -1) {
-      const sourceTable = sFloor.tables[sourceIdx];
-      const targetTable = tFloor.tables[targetIdx];
-
-      newFloors[target.floor].tables[targetIdx] = { 
-        ...targetTable, 
-        status: sourceTable.status, 
-        guests: sourceTable.guests,
-        timeElapsed: sourceTable.timeElapsed,
-        orders: sourceTable.orders
-      };
- 
-      sFloor.tables[sourceIdx] = { 
-        ...sourceTable, 
-        status: "empty", 
-        guests: undefined, 
-        timeElapsed: undefined,
-        orders: []
-      };
-
-      setFloors(newFloors);
-      cancelTransfer();
-    }
-  };
-
   const cancelTransfer = () => {
     setTransferMode("none");
     setSource(null);
     setTarget(null);
   };
+
+  if (loading && floors.length === 0) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-20 animate-in fade-in duration-700">
+        <div className="w-20 h-20 border-4 border-primary/20 border-t-primary rounded-full animate-spin mb-6" />
+        <h3 className="text-2xl font-black text-on-surface tracking-tight">Đang kết nối Cloud...</h3>
+        <p className="text-outline font-medium mt-2">Vui lòng chờ trong giây lát</p>
+      </div>
+    );
+  }
+
+  if (!activeFloor) {
+     return (
+        <div className="flex-1 flex flex-col items-center justify-center p-20 text-center animate-in zoom-in-95 duration-500">
+           <div className="w-24 h-24 bg-surface-container-low rounded-[32px] flex items-center justify-center text-outline mb-8">
+              <Users size={48} strokeWidth={1.5} />
+           </div>
+           <h3 className="text-3xl font-black text-on-surface tracking-tight">Chưa có Sơ đồ bàn</h3>
+           <p className="text-outline font-medium mt-2 max-w-md">Hệ thống không tìm thấy dữ liệu bàn ghế trên Cloud. Vui lòng kiểm tra lại cấu trúc bảng 'floors' trên Supabase.</p>
+        </div>
+     );
+  }
 
   return (
     <div className="flex flex-col gap-10 max-w-7xl mx-auto px-4 lg:px-10 pb-20">
@@ -122,14 +135,14 @@ export default function TableMapPage() {
           <div className="bg-[#006a67] text-white px-8 py-3 rounded-full shadow-2xl flex items-center gap-6 border border-white/20">
             <div className="flex flex-col">
               <span className="text-[10px] font-black uppercase tracking-widest opacity-60 leading-none">
-                {transferMode === "source" ? "Transfer Step 1" : "Transfer Step 2"}
+                {transferMode === "source" ? t.transferStep1 : t.transferStep2}
               </span>
               <span className="text-sm font-bold mt-1">
                 {transferMode === "source" 
-                  ? "Select a table to move" 
+                  ? t.selectToMove 
                   : target 
-                    ? `Move to Table ${target.id} (${floors[target.floor].name})?`
-                    : `Moving Table ${source?.id}... Select destination`
+                    ? `${t.moveToTable} ${target.id} (${getFloorName(floors[target.floor])})?`
+                    : `${t.movingTable} ${source?.id}... ${t.selectDestination}`
                 }
               </span>
             </div>
@@ -138,16 +151,8 @@ export default function TableMapPage() {
                 onClick={cancelTransfer}
                 className="px-4 py-2 hover:bg-white/10 rounded-full text-xs font-black uppercase tracking-widest transition-colors"
               >
-                Cancel
+                {commonT.cancel}
               </button>
-              {target && (
-                <button 
-                  onClick={executeTransfer}
-                  className="bg-[#71f5ea] text-[#006a67] px-6 py-2 rounded-full text-xs font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg"
-                >
-                  Confirm Transfer
-                </button>
-              )}
             </div>
           </div>
         </div>
@@ -156,34 +161,36 @@ export default function TableMapPage() {
       {/* Dashboard Header */}
       <div className="flex justify-between items-end mb-4">
         <div className="animate-in fade-in slide-in-from-left-4 duration-500">
-          <h2 className="text-3xl font-extrabold text-on-surface tracking-tight">{activeFloor.name}</h2>
-          <p className="text-outline mt-1 font-medium">{activeFloor.tables.filter(t => t.status !== "empty").length}/{activeFloor.tables.length} Tables Active</p>
+          <h2 className="text-3xl font-extrabold text-on-surface tracking-tight">
+            {getFloorName(activeFloor)}
+          </h2>
+          <p className="text-outline mt-1 font-medium">{activeFloor.tables ? activeFloor.tables.filter(t => t.status !== "empty").length : 0}/{activeFloor.tables ? activeFloor.tables.length : 0} {t.activeTables}</p>
         </div>
         
         {/* Legend */}
         <div className="flex gap-8 items-center bg-surface-container-lowest px-8 py-5 rounded-[24px] shadow-sm border border-surface-container-low animate-in fade-in slide-in-from-right-4 duration-500">
           <div className="flex items-center gap-2.5">
             <div className="w-3.5 h-3.5 rounded-full bg-[#d1d1d1]"></div>
-            <span className="text-xs font-black text-outline tracking-widest uppercase">Empty</span>
+            <span className="text-xs font-black text-outline tracking-widest uppercase">{t.statusEmpty}</span>
           </div>
           <div className="flex items-center gap-2.5">
             <div className="w-3.5 h-3.5 rounded-full bg-[#71f5ea]"></div>
-            <span className="text-xs font-black text-[#006a67] tracking-widest">OCCUPIED</span>
+            <span className="text-xs font-black text-[#006a67] tracking-widest">{t.statusOccupied}</span>
           </div>
           <div className="flex items-center gap-2.5">
             <div className="w-3.5 h-3.5 rounded-full bg-[#ffcc4d]"></div>
-            <span className="text-xs font-black text-[#856404] tracking-widest">BILL PRINTED</span>
+            <span className="text-xs font-black text-[#856404] tracking-widest">{t.statusBillPrinted}</span>
           </div>
           <div className="flex items-center gap-2.5">
             <div className="w-3.5 h-3.5 rounded-full bg-[#ff9999]"></div>
-            <span className="text-xs font-black text-[#a64444] tracking-widest uppercase">RESERVED</span>
+            <span className="text-xs font-black text-[#a64444] tracking-widest uppercase">{t.statusReserved}</span>
           </div>
         </div>
       </div>
 
       {/* Bento-Style Table Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-        {activeFloor.tables.map((table) => (
+        {activeFloor.tables && activeFloor.tables.map((table) => (
           <div 
             key={table.id} 
             onClick={() => handleTableClick(table)}
@@ -206,13 +213,13 @@ export default function TableMapPage() {
         <div className="lg:col-span-2 bg-surface-container-lowest rounded-[32px] p-10 flex border border-surface-container-low shadow-ambient justify-between items-center">
             <div className="flex flex-col gap-6">
                 <div>
-                  <h3 className="text-2xl font-extrabold text-on-surface tracking-tight">Floor Overview</h3>
-                  <p className="text-outline text-sm mt-1 font-medium">Real-time status of all dining zones</p>
+                  <h3 className="text-2xl font-extrabold text-on-surface tracking-tight">{t.floorOverview}</h3>
+                  <p className="text-outline text-sm mt-1 font-medium">{t.realTimeStatus}</p>
                 </div>
                 <div className="flex gap-4">
-                    <StatBox label="TURNOVER RATE" value="1.4h" highlight />
-                    <StatBox label="WAITLIST" value="4 Parties" />
-                    <StatBox label="REVENUE" value={`$${floors.reduce((acc, f) => acc + f.tables.reduce((t_acc, t) => t_acc + t.orders.reduce((o_acc, o) => o_acc + (o.price * o.quantity), 0), 0), 0).toLocaleString()}`} />
+                    <StatBox label={t.turnoverRate} value="1.4h" highlight={t.avg} />
+                    <StatBox label={t.waitlist} value={`4 ${t.parties}`} />
+                    <StatBox label={t.revenue} value={`$${floors.reduce((acc, f) => acc + f.tables.reduce((t_acc, t) => t_acc + t.orders.reduce((o_acc, o) => o_acc + (o.price * o.quantity), 0), 0), 0).toLocaleString()}`} />
                 </div>
             </div>
             
@@ -226,7 +233,7 @@ export default function TableMapPage() {
                 transferMode === "none" ? "bg-[#006a67] text-white hover:bg-[#005a57]" : "bg-surface-container-low text-outline cursor-not-allowed"
               )}
             >
-                Transfer Table
+                {t.transferTable}
             </button>
         </div>
 
@@ -238,8 +245,10 @@ export default function TableMapPage() {
             <Share2 size={32} strokeWidth={2.5} />
           </div>
           <div>
-            <h3 className="text-xl font-bold text-on-surface tracking-tight">Switch View</h3>
-            <p className="text-sm text-outline font-medium">{floors[(activeFloorIndex + 1) % floors.length].name}</p>
+            <h3 className="text-xl font-bold text-on-surface tracking-tight">{t.switchView}</h3>
+            <p className="text-sm text-outline font-medium">
+              {getFloorName(floors[(activeFloorIndex + 1) % floors.length])}
+            </p>
           </div>
           <div className="flex gap-2">
             {floors.map((_, i) => (
@@ -255,7 +264,7 @@ export default function TableMapPage() {
       {/* FAB - Quick Takeaway */}
       <div className="fixed bottom-10 right-10 flex flex-col items-end gap-3 z-50">
         <div className="bg-primary text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg animate-in fade-in slide-in-from-right-4 duration-500 delay-500">
-          Quick Takeaway
+          {t.quickTakeaway}
         </div>
         <button 
           onClick={() => router.push('/order-menu?table=TAKEAWAY')}
@@ -286,9 +295,9 @@ export default function TableMapPage() {
                   <div className="w-20 h-20 bg-brand-coral/20 text-on-coral rounded-full flex items-center justify-center mb-8 animate-in zoom-in-50 delay-150 duration-500">
                     <Bookmark size={40} fill="currentColor" />
                   </div>
-                  <h3 className="text-4xl font-black text-on-surface text-center mb-2 tracking-tighter">Table {selectedTable.number}</h3>
+                  <h3 className="text-4xl font-black text-on-surface text-center mb-2 tracking-tighter">{t.table} {selectedTable.number}</h3>
                   <div className="bg-brand-coral/10 px-4 py-1 rounded-full text-[10px] font-black text-on-coral uppercase tracking-widest mb-8">
-                     Reserved Booking
+                     {t.statusReserved}
                   </div>
 
                   <div className="w-full bg-surface-container-low rounded-3xl p-8 mb-10 space-y-6">
@@ -297,8 +306,8 @@ export default function TableMapPage() {
                        <span className="text-xl font-black">{selectedTable.reservedBy || "Unknown Guest"}</span>
                     </div>
                     <div className="flex justify-between items-center text-on-surface">
-                       <span className="text-[10px] font-black text-outline uppercase tracking-widest">Time & Pax</span>
-                       <span className="text-xl font-black">{selectedTable.reservedTime} • {selectedTable.pax} Guests</span>
+                       <span className="text-[10px] font-black text-outline uppercase tracking-widest">Time & {t.paxLabel}</span>
+                       <span className="text-xl font-black">{selectedTable.reservedTime} • {selectedTable.pax} {t.paxLabel}</span>
                     </div>
                   </div>
 
@@ -308,13 +317,13 @@ export default function TableMapPage() {
                      className="w-full py-6 bg-primary text-white rounded-[24px] font-black text-lg shadow-xl hover:shadow-primary/30 active:scale-95 transition-all duration-300 flex items-center justify-center gap-3 group"
                     >
                       <CheckCircle2 size={24} />
-                      Confirm Guest Arrival
+                      {t.confirmArrival}
                     </button>
                     <button 
                      onClick={() => setSelectedTable(null)}
                      className="w-full py-5 text-outline font-black text-[10px] uppercase tracking-[0.25em] hover:text-on-surface transition-colors"
                     >
-                      Keep reserved
+                      {t.keepReserved}
                     </button>
                   </div>
                </div>
@@ -323,8 +332,8 @@ export default function TableMapPage() {
                 <div className="w-20 h-20 bg-primary-container text-primary rounded-full flex items-center justify-center mb-8 animate-in zoom-in-50 delay-150 duration-500">
                   <Users size={40} />
                 </div>
-                <h3 className="text-4xl font-black text-on-surface text-center mb-2 tracking-tighter animate-in fade-in slide-in-from-top-4 delay-200 duration-500">Table {selectedTable.number}</h3>
-                <p className="text-sm font-bold text-outline text-center mb-10 animate-in fade-in slide-in-from-top-4 delay-300 duration-500">Assign guests to start a new dining session.</p>
+                <h3 className="text-4xl font-black text-on-surface text-center mb-2 tracking-tighter animate-in fade-in slide-in-from-top-4 delay-200 duration-500">{t.table} {selectedTable.number}</h3>
+                <p className="text-sm font-bold text-outline text-center mb-10 animate-in fade-in slide-in-from-top-4 delay-300 duration-500">{t.realTimeStatus}</p>
                 
                 <div className="w-full space-y-8 mb-12 animate-in fade-in slide-in-from-bottom-8 delay-400 duration-700">
                    {!showKeypad ? (
@@ -342,7 +351,7 @@ export default function TableMapPage() {
                              className="flex flex-col items-center group"
                            >
                              <span className="text-6xl font-black text-on-surface tracking-tighter group-hover:scale-110 transition-transform">{guestCount}</span>
-                             <span className="text-[10px] font-black text-primary uppercase tracking-widest mt-1 opacity-0 group-hover:opacity-100 transition-opacity">Tap to type</span>
+                             <span className="text-[10px] font-black text-primary uppercase tracking-widest mt-1 opacity-0 group-hover:opacity-100 transition-opacity">{t.tapToType}</span>
                            </button>
 
                            <button 
@@ -362,7 +371,7 @@ export default function TableMapPage() {
                                  guestCount === n ? "bg-primary text-white shadow-md scale-105" : "bg-surface-container-low text-outline hover:bg-surface-container-highest"
                                )}
                              >
-                               {n} PAX
+                               {n} {t.paxLabel}
                              </button>
                            ))}
                            <button 
@@ -402,8 +411,8 @@ export default function TableMapPage() {
                            </button>
                         </div>
                         <div className="flex justify-between items-center py-2 px-4 bg-surface-container-low rounded-2xl">
-                           <span className="text-[10px] font-black text-outline uppercase tracking-widest">Entry Mode</span>
-                           <span className="text-lg font-black text-primary">{guestCount} PAXS</span>
+                           <span className="text-[10px] font-black text-outline uppercase tracking-widest">{t.entryMode}</span>
+                           <span className="text-lg font-black text-primary">{guestCount} {t.paxLabel}</span>
                         </div>
                      </div>
                    )}
@@ -415,13 +424,13 @@ export default function TableMapPage() {
                     className="w-full py-6 bg-primary text-white rounded-[24px] font-black text-lg shadow-xl hover:shadow-primary/30 active:scale-95 transition-all duration-300 flex items-center justify-center gap-3 group"
                    >
                      <ReceiptText size={24} className="group-hover:rotate-12 transition-transform" />
-                     Assign & Open Menu
+                     {t.assignOpenMenu}
                    </button>
                    <button 
                     onClick={() => setSelectedTable(null)}
                     className="w-full py-5 text-outline font-black text-[10px] uppercase tracking-[0.25em] hover:text-on-surface transition-colors"
                    >
-                     Cancel seating
+                     {t.cancelSeating}
                    </button>
                 </div>
               </div>
@@ -469,9 +478,40 @@ function TableCard({ table }: { table: Table }) {
   const isReserved = table.status === "reserved";
   const isEmpty = table.status === "empty";
   
+  const { language } = useSettingsStore();
+  const t = translations[language].tableMapPage;
+  const orderMenuT = translations[language].orderMenuPage;
+  
   const totalAmount = table.orders.reduce((acc, o) => acc + (o.price * o.quantity), 0);
   const isFoodReady = table.orders.some(o => o.status === "ready");
   const isPreparing = table.orders.some(o => o.status === "preparing") && !isFoodReady;
+
+  const formatPrice = (price: number) => {
+    const converted = price * orderMenuT.priceScale;
+    if (language === 'vi') {
+      return `${converted.toLocaleString()} ${orderMenuT.currencySymbol}`;
+    }
+    return `${orderMenuT.currencySymbol}${price.toFixed(2)}`;
+  };
+
+  const formatTimeElapsed = (time: string | undefined) => {
+    if (!time) return null;
+    
+    // Robust mapping for legacy or key-based strings
+    const lowerTime = time.toLowerCase().trim();
+    if (lowerTime === "justarrived" || lowerTime === "just arrived") return t.justArrived;
+    if (lowerTime === "juststarted" || lowerTime === "just started") return t.justStarted;
+    
+    // Handle duration strings like "1H 20M" -> "1h 20p" or "45M" -> "45p"
+    if (language === 'vi') {
+      return time
+        .toLowerCase()
+        .replace(/h/g, 'h')
+        .replace(/m/g, 'p');
+    }
+    
+    return time;
+  };
 
   return (
     <div 
@@ -511,10 +551,10 @@ function TableCard({ table }: { table: Table }) {
         
         {table.timeElapsed && (
           <div className={cn(
-            "px-2 py-0.5 rounded-md text-[10px] font-bold",
+            "px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider",
             isOccupied ? "bg-primary text-white" : "bg-on-gold text-brand-gold"
           )}>
-            {table.timeElapsed}
+            {formatTimeElapsed(table.timeElapsed)}
           </div>
         )}
       </div>
@@ -522,7 +562,7 @@ function TableCard({ table }: { table: Table }) {
       <div className="flex flex-col gap-0.5">
         {isReserved ? (
           <div>
-            <p className="text-[10px] font-bold text-on-coral/70 uppercase">Reserved</p>
+            <p className="text-[10px] font-bold text-on-coral/70 uppercase">{t.statusReserved}</p>
             <p className="text-lg font-black text-on-coral">{table.reservedTime}</p>
           </div>
         ) : isEmpty ? (
@@ -535,12 +575,12 @@ function TableCard({ table }: { table: Table }) {
               <p className={cn(
                 "text-xl font-black",
                 isOccupied ? "text-primary" : "text-on-gold"
-              )}>${totalAmount.toFixed(2)}</p>
+              )}>{formatPrice(totalAmount)}</p>
             </div>
             {table.guests && (
               <div className="flex items-center gap-1 mt-0.5">
                 <Users size={12} className={cn(isOccupied ? "text-primary/60" : "text-on-gold/60")} />
-                <span className={cn("text-[10px] font-bold", isOccupied ? "text-primary/60" : "text-on-gold/60")}>{table.guests} Guests</span>
+                <span className={cn("text-[10px] font-bold", isOccupied ? "text-primary/60" : "text-on-gold/60")}>{table.guests} {t.paxLabel}</span>
               </div>
             )}
           </div>
@@ -550,13 +590,13 @@ function TableCard({ table }: { table: Table }) {
   );
 }
 
-function StatBox({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+function StatBox({ label, value, highlight }: { label: string; value: string; highlight?: string }) {
   return (
     <div className="bg-surface-container-low px-5 py-4 rounded-xl min-w-[140px]">
       <p className="text-[10px] font-black text-outline uppercase tracking-widest">{label}</p>
       <div className="flex items-baseline gap-1.5 mt-1.5">
         <span className="text-2xl font-bold text-on-surface">{value}</span>
-        {highlight && <span className="text-xs text-primary font-bold">avg</span>}
+        {highlight && <span className="text-xs text-primary font-bold">{highlight}</span>}
       </div>
     </div>
   );

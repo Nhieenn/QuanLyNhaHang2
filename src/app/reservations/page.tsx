@@ -11,36 +11,51 @@ import {
   Calendar as CalendarIcon,
   Minus,
   Plus,
-  Hash
+  Hash,
+  Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTableStore } from "@/store/tableStore";
+import { TablePickerModal } from "@/components/reservations/TablePickerModal";
+import { useSettingsStore } from "@/store/settingsStore";
+import { translations } from "@/lib/translations";
 
-export default function ReservationsPage() {
-  const [viewDate, setViewDate] = useState(new Date(2023, 9, 1)); // Khởi tạo: Tháng 10/2023
-  const [selectedFullDate, setSelectedFullDate] = useState(new Date(2023, 9, 24));
+function ReservationsContent() {
+  const { language } = useSettingsStore();
+  const t = translations[language].reservationsPage;
+  const tableMapT = translations[language].tableMapPage;
+
+  const now = new Date();
+  const [viewDate, setViewDate] = useState(now); 
+  const [selectedFullDate, setSelectedFullDate] = useState(now);
   const [selectedSlot, setSelectedSlot] = useState("19:00");
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [paxCount, setPaxCount] = useState(2);
   const [isPaxPickerOpen, setIsPaxPickerOpen] = useState(false);
   const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
   
-  // Smart Pax Picker Logic (Numpad)
   const [paxEntryMode, setPaxEntryMode] = useState<"stepper" | "numpad">("stepper");
   const [tempPaxValue, setTempPaxValue] = useState("");
 
-  const { addReservation, floors, assignTable } = useTableStore();
+  const { addReservation, reservations, floors, assignTable } = useTableStore();
   const [guestName, setGuestName] = useState("");
   const [notes, setNotes] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
+  const [isSendingNotification, setIsSendingNotification] = useState(false);
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
+  const [isTablePickerOpen, setIsTablePickerOpen] = useState(false);
+
+  const selectedTable = floors.flatMap(f => f.tables).find(t => t.id === selectedTableId);
 
   // Get all empty tables across all floors
   const availableTables = floors.flatMap(f => f.tables.filter(t => t.status === "empty"));
+  const totalTablesCount = floors.reduce((acc, f) => acc + f.tables.length, 0);
 
   const handleConfirmBooking = () => {
     if (!guestName.trim()) return;
 
+    setIsSendingNotification(true);
+    
     // Create reservation with tableId
     addReservation({
       guestName,
@@ -51,31 +66,36 @@ export default function ReservationsPage() {
       tableId: selectedTableId || undefined
     });
 
-    setIsSuccess(true);
+    // Simulate notification sending
+    setTimeout(() => {
+        setIsSendingNotification(false);
+        setIsSuccess(true);
+    }, 1500);
+
     setTimeout(() => {
       setIsSuccess(false);
       setGuestName("");
       setNotes("");
       setSelectedTableId(null);
-    }, 3000);
+    }, 5000);
   };
 
   const currentYear = viewDate.getFullYear();
   const currentMonth = viewDate.getMonth();
 
-  const years = Array.from({ length: 11 }, (_, i) => 2020 + i);
+  const years = Array.from({ length: 6 }, (_, i) => now.getFullYear() + i);
   const paxOptions = Array.from({ length: 12 }, (_, i) => i + 1);
 
-  const timeSlots = [
-    { time: "18:00", status: "available" },
-    { time: "18:30", status: "available" },
-    { time: "19:00", status: "available" },
-    { time: "19:30", status: "available" },
-    { time: "20:00", status: "occupied" },
-    { time: "20:30", status: "available" },
-    { time: "21:00", status: "available" },
-    { time: "21:30", status: "available" },
-  ];
+  // Dynamic Time Slots Check
+  const baseSlots = ["18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30"];
+  const dateStr = selectedFullDate.toISOString().split('T')[0];
+  
+  const timeSlots = baseSlots.map(time => {
+    const bookingsAtTime = reservations.filter(r => r.date === dateStr && r.time === time);
+    // Nếu số đơn đặt chỗ >= số bàn hiện có (đơn giản hóa), coi như hết chỗ
+    const isOccupied = bookingsAtTime.length >= totalTablesCount;
+    return { time, status: isOccupied ? "occupied" : "available" as const };
+  });
 
   // Calendar Helpers
   const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
@@ -124,24 +144,54 @@ export default function ReservationsPage() {
     setIsTimePickerOpen(false);
   };
 
+  // Dynamic Occupancy Logic
+  const isSelectedDateToday = selectedFullDate.toDateString() === new Date().toDateString();
+  const currentOccupancy = isSelectedDateToday 
+    ? floors.flatMap(f => f.tables).filter(t => t.status !== "empty").length 
+    : 0;
+  
+  const slotBookingsCount = reservations.filter(r => 
+    r.date === selectedFullDate.toISOString().split('T')[0] && 
+    r.time === selectedSlot && 
+    r.status !== "cancelled"
+  ).length;
+
+  const totalEffectiveLoad = currentOccupancy + slotBookingsCount;
+  const loadRate = (totalEffectiveLoad / (totalTablesCount || 1)) * 100;
+
+  const getStatusInfo = () => {
+    if (loadRate >= 95) return { label: t.statusFull, color: "bg-brand-coral/20 text-brand-coral border border-brand-coral/30" };
+    if (loadRate >= 75) return { label: t.statusHighDemand, color: "bg-[#ffca51] text-on-surface shadow-sm" };
+    if (loadRate >= 40) return { label: t.statusModerate, color: "bg-primary/20 text-primary border border-primary/30" };
+    return { label: t.statusQuiet, color: "bg-brand-emerald/20 text-[#006a67] border border-brand-emerald/30" };
+  };
+
+  const statusInfo = getStatusInfo();
+
   const isSelected = (date: number) => {
     return selectedFullDate.getDate() === date && 
            selectedFullDate.getMonth() === currentMonth && 
            selectedFullDate.getFullYear() === currentYear;
   };
 
-  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const monthNames = t.calendar.months;
 
   return (
     <div className="flex flex-col min-h-screen bg-surface">
       {/* Reservations Title Section - Positioned like Table Map's 'Main Dining Room' */}
       <div className="px-10 pt-6">
-        <h2 className="text-3xl font-extrabold text-on-surface tracking-tight">Reservations Hub</h2>
-        <p className="text-outline mt-1 font-medium">Capture every guest booking with ease</p>
+        <h2 className="text-3xl font-extrabold text-on-surface tracking-tight">{t.title}</h2>
+        <p className="text-outline mt-1 font-medium">{t.subtitle}</p>
       </div>
+      {isSendingNotification && (
+        <div className="bg-primary/10 text-primary px-6 py-3 rounded-2xl font-black text-sm animate-pulse mx-10 mt-4 flex items-center gap-3">
+           <Loader2 size={16} className="animate-spin" />
+           {t.sendingSms}
+        </div>
+      )}
       {isSuccess && (
         <div className="bg-brand-teal/20 text-[#006a67] px-6 py-3 rounded-2xl font-black text-sm animate-in fade-in slide-in-from-top-4 mx-10 mt-4">
-           ✓ Booking Saved Successfully
+           {t.bookingSaved}
         </div>
       )}
 
@@ -183,7 +233,7 @@ export default function ReservationsPage() {
               <div className="flex-1 flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
                 {/* Year Slider (Horizontal) */}
                 <div className="flex flex-col gap-3">
-                  <span className="text-[10px] font-black text-outline/60 tracking-widest uppercase ml-1">Select Year</span>
+                  <span className="text-[10px] font-black text-outline/60 tracking-widest uppercase ml-1">{t.calendar.selectYear}</span>
                   <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar snap-x">
                     {years.map(year => (
                       <button
@@ -204,7 +254,7 @@ export default function ReservationsPage() {
 
                 {/* Month Grid */}
                 <div className="flex flex-col gap-3 flex-1">
-                  <span className="text-[10px] font-black text-outline/60 tracking-widest uppercase ml-1">Select Month</span>
+                  <span className="text-[10px] font-black text-outline/60 tracking-widest uppercase ml-1">{t.calendar.selectMonth}</span>
                   <div className="grid grid-cols-3 gap-2 flex-1">
                     {monthNames.map((name, i) => (
                       <button
@@ -227,14 +277,14 @@ export default function ReservationsPage() {
                   onClick={() => setIsPickerOpen(false)}
                   className="mt-2 py-3 bg-surface-container-highest text-on-surface font-black text-xs rounded-xl uppercase tracking-widest hover:bg-outline/10 transition-colors"
                 >
-                  Back to Calendar
+                  {t.calendar.backToCalendar}
                 </button>
               </div>
             ) : (
               <div className="flex-1 animate-in fade-in slide-in-from-top-4 duration-300">
                 {/* Calendar Grid */}
                 <div className="grid grid-cols-7 gap-y-2 text-center">
-                  {['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'].map(day => (
+                  {t.calendar.days.map(day => (
                     <span key={day} className="text-[10px] font-black text-outline/40 tracking-widest mb-4 uppercase">{day}</span>
                   ))}
                   
@@ -283,7 +333,7 @@ export default function ReservationsPage() {
           <div className="bg-surface-container-low rounded-[32px] p-8">
             <div className="flex items-center gap-3 mb-7">
               <Clock size={24} className="text-[#006a67]" strokeWidth={2.5} />
-              <h2 className="text-xl font-black text-on-surface font-display tracking-tight">Available Slots</h2>
+              <h2 className="text-xl font-black text-on-surface font-display tracking-tight">{t.calendar.availableSlots}</h2>
             </div>
 
             <div className="grid grid-cols-3 gap-3">
@@ -313,24 +363,27 @@ export default function ReservationsPage() {
           
           <div className="flex justify-between items-start mb-10">
             <div className="flex flex-col gap-1">
-              <h1 className="text-4xl font-black text-on-surface font-display tracking-tight">New Reservation</h1>
-              <p className="text-outline font-medium">Fill in the details to secure the table</p>
+              <h1 className="text-4xl font-black text-on-surface font-display tracking-tight">{t.form.title}</h1>
+              <p className="text-outline font-medium">{t.form.subtitle}</p>
             </div>
-            <div className="bg-[#ffca51] text-on-surface text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest shadow-sm">
-              High Demand
+            <div className={cn(
+              "text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest transition-all duration-500",
+              statusInfo.color
+            )}>
+              {statusInfo.label}
             </div>
           </div>
 
           <div className="flex flex-col gap-8 flex-1">
             {/* Guest Name */}
             <div className="flex flex-col gap-3">
-              <label className="text-[10px] uppercase font-black text-outline/60 tracking-widest ml-1">Guest Name</label>
+              <label className="text-[10px] uppercase font-black text-outline/60 tracking-widest ml-1">{t.form.guestName}</label>
               <div className="bg-surface-container-low p-5 rounded-2xl focus-within:ring-2 ring-primary/20 transition-all">
                 <input 
                   type="text" 
                   value={guestName}
                   onChange={(e) => setGuestName(e.target.value)}
-                  placeholder="e.g. Julianne Moore"
+                  placeholder={t.form.namePlaceholder}
                   className="bg-transparent border-none focus:ring-0 w-full text-xl font-bold text-on-surface placeholder-on-surface/20"
                 />
               </div>
@@ -338,31 +391,31 @@ export default function ReservationsPage() {
 
             {/* Table Selection */}
             <div className="flex flex-col gap-3">
-              <label className="text-[10px] uppercase font-black text-outline/60 tracking-widest ml-1">Assign Table (Optional)</label>
-              <div className="flex gap-2 overflow-x-auto pb-4 no-scrollbar">
-                <button
-                  onClick={() => setSelectedTableId(null)}
-                  className={cn(
-                    "px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shrink-0 transition-all",
-                    selectedTableId === null ? "bg-[#006a67] text-white" : "bg-surface-container-low text-outline hover:bg-surface-container"
-                  )}
-                >
-                  Unassigned
-                </button>
-                {availableTables.map(table => (
-                  <button
-                    key={table.id}
-                    onClick={() => setSelectedTableId(table.id)}
-                    className={cn(
-                      "px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shrink-0 transition-all border-2",
-                      selectedTableId === table.id 
-                        ? "bg-brand-coral/10 border-brand-coral text-on-coral" 
-                        : "bg-white border-surface-container-low text-on-surface hover:border-outline"
-                    )}
-                  >
-                    Table {table.number}
-                  </button>
-                ))}
+              <label className="text-[10px] uppercase font-black text-outline/60 tracking-widest ml-1">{t.form.assignTable}</label>
+              <div 
+                onClick={() => setIsTablePickerOpen(true)}
+                className={cn(
+                  "bg-surface-container-low p-6 rounded-2xl flex items-center justify-between cursor-pointer group transition-all",
+                  selectedTableId ? "bg-brand-coral/5 border-2 border-brand-coral/20" : "hover:bg-surface-container-highest"
+                )}
+              >
+                <div className="flex items-center gap-4">
+                  <div className={cn(
+                    "w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs",
+                    selectedTableId ? "bg-brand-coral text-white" : "bg-surface-container-highest text-outline"
+                  )}>
+                    {selectedTable ? `${t.form.tablePrefix}-${selectedTable.number}` : "???"}
+                  </div>
+                  <div>
+                    <span className="font-bold text-on-surface">
+                      {selectedTable ? `${tableMapT.table} ${selectedTable.number}` : t.form.noTable}
+                    </span>
+                    <p className="text-[10px] font-black text-outline uppercase tracking-widest">
+                       {selectedTableId ? (language === 'vi' ? "Đã giữ vị trí cụ thể" : "Specific placement secured") : (language === 'vi' ? "Chạm để chọn từ sơ đồ" : "Touch to select from floor plan")}
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight size={20} className="text-outline group-hover:text-primary transition-colors" />
               </div>
             </div>
 
@@ -370,7 +423,7 @@ export default function ReservationsPage() {
             <div className="grid grid-cols-2 gap-6">
               {/* PAX Selection */}
               <div className="flex flex-col gap-3">
-                <label className="text-[10px] uppercase font-black text-outline/60 tracking-widest ml-1">PAX (Number of Guests)</label>
+                <label className="text-[10px] uppercase font-black text-outline/60 tracking-widest ml-1">{t.form.paxLabel}</label>
                 <div 
                   onClick={() => setIsPaxPickerOpen(!isPaxPickerOpen)}
                   className={cn(
@@ -378,14 +431,14 @@ export default function ReservationsPage() {
                     isPaxPickerOpen ? "bg-[#006a67]/5 shadow-inner" : "hover:bg-surface-container-highest"
                   )}
                 >
-                  <span className="text-xl font-bold text-on-surface">{paxCount} Guests</span>
+                  <span className="text-xl font-bold text-on-surface">{paxCount} {t.form.guestsSuffix}</span>
                   <Users size={20} className={cn("transition-colors", isPaxPickerOpen ? "text-[#006a67]" : "text-outline group-hover:text-primary")} />
                 </div>
               </div>
 
               {/* Time Selection */}
               <div className="flex flex-col gap-3">
-                <label className="text-[10px] uppercase font-black text-outline/60 tracking-widest ml-1">Time Preference</label>
+                <label className="text-[10px] uppercase font-black text-outline/60 tracking-widest ml-1">{t.form.timePreference}</label>
                 <div 
                   onClick={() => setIsTimePickerOpen(!isTimePickerOpen)}
                   className={cn(
@@ -404,13 +457,13 @@ export default function ReservationsPage() {
               <div className="bg-surface-container-low p-8 rounded-[32px] animate-in fade-in zoom-in-95 duration-200 border border-[#006a67]/20 shadow-xl overflow-hidden min-h-[400px] flex flex-col">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-lg font-black text-on-surface tracking-tight uppercase">
-                    {isPaxPickerOpen ? "Select Guest Count" : "Select Preferred Time"}
+                    {isPaxPickerOpen ? t.paxPicker.title : t.paxPicker.titleTime}
                   </h3>
                   <button 
                     onClick={() => { setIsPaxPickerOpen(false); setIsTimePickerOpen(false); setPaxEntryMode("stepper"); }}
                     className="text-xs font-black text-outline hover:text-on-surface transition-colors"
                   >
-                    CLOSE
+                    {t.paxPicker.close}
                   </button>
                 </div>
 
@@ -436,7 +489,7 @@ export default function ReservationsPage() {
                             </span>
                             <div className="flex items-center gap-1 text-[10px] font-black text-outline uppercase tracking-widest mt-1">
                               <Hash size={10} />
-                              <span>Tap to type</span>
+                              <span>{t.paxPicker.tapToType}</span>
                             </div>
                           </div>
 
@@ -469,7 +522,7 @@ export default function ReservationsPage() {
                         <div className="bg-white px-8 py-4 rounded-2xl mb-6 shadow-inner border-2 border-primary">
                           <span className="text-5xl font-black text-primary tracking-tighter">
                             {tempPaxValue || "0"}
-                            <span className="text-xl ml-2 font-black text-outline/40">PAXS</span>
+                            <span className="text-xl ml-2 font-black text-outline/40">{t.paxPicker.paxUnit}</span>
                           </span>
                         </div>
                         
@@ -515,12 +568,12 @@ export default function ReservationsPage() {
             )}
 
             <div className="flex flex-col gap-3 flex-1">
-              <label className="text-[10px] uppercase font-black text-outline/60 tracking-widest ml-1">Notes & Special Requests</label>
+              <label className="text-[10px] uppercase font-black text-outline/60 tracking-widest ml-1">{t.form.notes}</label>
               <div className="bg-surface-container-low p-6 rounded-2xl flex-1 focus-within:bg-white transition-colors border-2 border-transparent focus-within:border-primary/10">
                 <textarea 
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Allergies, anniversaries, or seating preferences..."
+                  placeholder={t.form.notesPlaceholder}
                   className="bg-transparent border-none focus:ring-0 w-full h-full text-lg font-semibold text-on-surface placeholder-on-surface/20 resize-none leading-relaxed"
                 />
               </div>
@@ -532,17 +585,30 @@ export default function ReservationsPage() {
                 disabled={!guestName.trim()}
                 className="bg-primary hover:bg-primary-dim disabled:opacity-30 disabled:grayscale text-white py-6 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] shadow-lg shadow-primary/20 group"
               >
-                <span className="text-xl font-black font-display tracking-tight">Confirm Booking</span>
+                <span className="text-xl font-black font-display tracking-tight">{t.form.confirmBtn}</span>
                 <CheckCircle2 size={24} className="group-hover:scale-110 transition-transform" />
               </button>
               
               <div className="flex items-center justify-center gap-2 text-outline/60 text-xs font-semibold">
-                <span>By confirming, a notification will be sent to the guest's contact number.</span>
+                <span>{t.form.notificationTip}</span>
               </div>
             </div>
           </div>
         </div>
       </main>
+
+      <TablePickerModal 
+        isOpen={isTablePickerOpen} 
+        onClose={() => setIsTablePickerOpen(false)} 
+        selectedTableId={selectedTableId}
+        onSelect={(tabId) => setSelectedTableId(tabId)}
+        selectedDate={selectedFullDate.toISOString().split('T')[0]}
+        selectedTime={selectedSlot}
+      />
     </div>
   );
+}
+
+export default function ReservationsPage() {
+  return <ReservationsContent />;
 }

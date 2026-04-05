@@ -14,11 +14,16 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTableStore, OrderItem } from "@/store/tableStore";
+import { useSettingsStore } from "@/store/settingsStore";
+import { translations } from "@/lib/translations";
 
 export default function KitchenKDSPage() {
   const { floors, updateItemStatus } = useTableStore();
   const [now, setNow] = useState(Date.now());
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [isPriorityMode, setIsPriorityMode] = useState(false);
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [globalNote, setGlobalNote] = useState("");
 
   // Lấy tất cả các món ăn đã gửi từ mọi tầng
   const activeOrders = floors.flatMap(floor => 
@@ -31,7 +36,7 @@ export default function KitchenKDSPage() {
           .sort((a, b) => a.timestamp - b.timestamp),
         startTime: Math.min(...table.orders.map(o => o.timestamp))
       }))
-  );
+  ).sort((a, b) => isPriorityMode ? a.startTime - b.startTime : 0);
 
   // Update timer every second
   useEffect(() => {
@@ -39,11 +44,25 @@ export default function KitchenKDSPage() {
     return () => clearInterval(timer);
   }, []);
 
+  const { language } = useSettingsStore();
+  const t = translations[language].kitchenPage;
+  const tableMapT = translations[language].tableMapPage;
+
   const formatTime = (startTime: number) => {
     const diff = Math.max(0, Math.floor((now - startTime) / 1000));
     const mins = Math.floor(diff / 60);
     const secs = diff % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}m`;
+    
+    if (mins >= 60) {
+      const hours = Math.floor(mins / 60);
+      const remainingMins = mins % 60;
+      const hSuffix = language === 'vi' ? 'h' : 'h';
+      const mSuffix = language === 'vi' ? 'p' : 'm';
+      return `${hours}${hSuffix} ${remainingMins}${mSuffix}`;
+    }
+
+    const suffix = language === 'vi' ? 'p' : 'm';
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}${suffix}`;
   };
 
   const toggleItemSelection = (cartId: string) => {
@@ -80,18 +99,27 @@ export default function KitchenKDSPage() {
       {/* Dashboard Header */}
       <div className="flex justify-between items-end mb-4">
         <div className="animate-in fade-in slide-in-from-left-4 duration-500">
-          <h2 className="text-4xl font-black text-on-surface tracking-tight">Kitchen Monitor</h2>
-          <p className="text-outline mt-1 font-bold">{activeOrders.length} Orders currently in preparation</p>
+          <h2 className="text-4xl font-black text-on-surface tracking-tight">{t.title}</h2>
+          <p className="text-outline mt-1 font-bold">{activeOrders.length} {t.subtitle}</p>
         </div>
         
         <div className="flex gap-4">
-          <button className="flex items-center gap-2.5 px-8 py-3.5 rounded-full bg-surface-container-highest text-on-surface font-black text-sm uppercase tracking-widest hover:bg-surface-container-high transition-colors shadow-sm">
-            <Zap size={18} strokeWidth={3} />
-            Priority View
+          <button 
+            onClick={() => setIsPriorityMode(!isPriorityMode)}
+            className={cn(
+              "flex items-center gap-2.5 px-8 py-3.5 rounded-full font-black text-sm uppercase tracking-widest transition-all shadow-sm active:scale-95",
+              isPriorityMode ? "bg-brand-coral text-white" : "bg-surface-container-highest text-on-surface hover:bg-surface-container-high"
+            )}
+          >
+            <Zap size={18} strokeWidth={3} className={cn(isPriorityMode && "animate-pulse")} />
+            {t.priorityView}
           </button>
-          <button className="flex items-center gap-2.5 px-8 py-3.5 rounded-full bg-[#006a67] text-white font-black text-sm uppercase tracking-widest hover:bg-[#005a57] transition-all active:scale-95 shadow-lg">
+          <button 
+            onClick={() => setShowNoteModal(true)}
+            className="flex items-center gap-2.5 px-8 py-3.5 rounded-full bg-[#006a67] text-white font-black text-sm uppercase tracking-widest hover:bg-[#005a57] transition-all active:scale-95 shadow-lg"
+          >
             <Plus size={18} strokeWidth={3} />
-            Internal Note
+            {t.internalNote}
           </button>
         </div>
       </div>
@@ -116,13 +144,13 @@ export default function KitchenKDSPage() {
                 <h3 className={cn(
                   "text-3xl font-black tracking-tight leading-none text-on-surface"
                 )}>
-                  Table {order.tableNumber}
+                  {tableMapT.table} {order.tableNumber}
                 </h3>
                 <div className="flex items-center gap-2 mt-2">
                   <span className={cn(
                     "text-sm font-bold opacity-70 text-on-surface"
                   )}>
-                    {order.guests} Guests • {order.items.length} Items
+                    {order.guests} {t.guestsUnit} • {order.items.length} {t.itemsUnit}
                   </span>
                 </div>
               </div>
@@ -172,17 +200,17 @@ export default function KitchenKDSPage() {
                         {item.status === "preparing" && (
                           <div className="flex items-center gap-1.5 bg-brand-gold/10 px-2 py-0.5 rounded-md border border-brand-gold/20">
                             <Zap size={10} className="text-[#856404]" fill="currentColor" />
-                            <span className="text-[10px] font-black text-[#856404] uppercase tracking-wider">Preparing</span>
+                            <span className="text-[10px] font-black text-[#856404] uppercase tracking-wider">{t.preparing}</span>
                           </div>
                         )}
                         {item.status === "ready" && (
                           <div className="flex items-center gap-1.5 bg-brand-teal/10 px-2 py-0.5 rounded-md border border-brand-teal/20">
                             <CheckCircle2 size={10} className="text-[#006a67]" />
-                            <span className="text-[10px] font-black text-[#006a67] uppercase tracking-wider">Ready</span>
+                            <span className="text-[10px] font-black text-[#006a67] uppercase tracking-wider">{t.ready}</span>
                           </div>
                         )}
                         {item.status === "sent" && (
-                          <span className="text-[10px] font-bold text-outline uppercase tracking-widest opacity-40">Just Ordered</span>
+                          <span className="text-[10px] font-bold text-outline uppercase tracking-widest opacity-40">{t.justOrdered}</span>
                         )}
                       </div>
                       
@@ -205,25 +233,25 @@ export default function KitchenKDSPage() {
               <button 
                 onClick={() => handlePrepareSelected(order.id, order.items)}
                 className={cn(
-                  "py-5 rounded-2xl font-black text-sm uppercase tracking-widest transition-all active:scale-95 border-2",
+                  "py-5 rounded-2xl font-black text-sm uppercase tracking-widest transition-all active:scale-[0.98] border-2",
                   selectedItems.size > 0 
                     ? "bg-brand-gold border-brand-gold text-[#856404] shadow-lg" 
                     : "bg-surface-container-low border-transparent text-outline"
                 )}
               >
-                {selectedItems.size > 0 ? `Prepare (${selectedItems.size}) Selected` : "Prepare All"}
+                {selectedItems.size > 0 ? t.prepareSelected.replace("{n}", selectedItems.size.toString()) : t.prepareAll}
               </button>
               <button 
                 onClick={() => handleReadySelected(order.id, order.items)}
                 className={cn(
-                  "py-5 rounded-2xl font-black text-sm uppercase tracking-widest transition-all active:scale-95 shadow-lg flex items-center justify-center gap-2",
+                  "py-5 rounded-2xl font-black text-sm uppercase tracking-widest transition-all active:scale-[0.98] shadow-lg flex items-center justify-center gap-2",
                   selectedItems.size > 0
                     ? "bg-[#006a67] text-white"
                     : "bg-surface-container text-outline"
                 )}
               >
                 <CheckCircle2 size={18} strokeWidth={3} />
-                {selectedItems.size > 0 ? `Ready (${selectedItems.size}) Selected` : "Ready All"}
+                {selectedItems.size > 0 ? t.readySelected.replace("{n}", selectedItems.size.toString()) : t.readyAll}
               </button>
             </div>
           </div>
@@ -231,11 +259,41 @@ export default function KitchenKDSPage() {
         {activeOrders.length === 0 && (
           <div className="col-span-full py-40 flex flex-col items-center justify-center text-outline opacity-20">
             <Zap size={80} className="mb-6" />
-            <h3 className="text-3xl font-black uppercase tracking-tighter">No Active Orders</h3>
-            <p className="font-bold">Waiting for tickets from the POS...</p>
+            <h3 className="text-3xl font-black uppercase tracking-tighter">{t.noActiveOrders}</h3>
+            <p className="font-bold">{t.waitingForTickets}</p>
           </div>
         )}
       </div>
+
+      {/* Internal Note Modal */}
+      {showNoteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center animate-in fade-in duration-300 px-4">
+          <div className="absolute inset-0 bg-on-surface/30 backdrop-blur-md" onClick={() => setShowNoteModal(false)} />
+          <div className="relative w-full max-w-[500px] bg-white rounded-[40px] p-10 shadow-2xl animate-in zoom-in-95 duration-300">
+             <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-black text-on-surface tracking-tight">{t.internalNote}</h3>
+                <button onClick={() => setShowNoteModal(false)} className="p-2 hover:bg-surface-container-low rounded-full transition-colors">
+                  <X size={24} />
+                </button>
+             </div>
+             <textarea 
+               value={globalNote}
+               onChange={(e) => setGlobalNote(e.target.value)}
+               placeholder="Nhập ghi chú quan trọng cho toàn bộ bếp..."
+               className="w-full h-40 bg-surface-container-low rounded-3xl p-6 text-on-surface font-sans text-sm focus:outline-none focus:ring-4 focus:ring-brand-teal/20 placeholder:text-outline/40 resize-none transition-all mb-6"
+             />
+             <button 
+               onClick={() => setShowNoteModal(false)}
+               className="w-full py-4 rounded-2xl bg-[#006a67] text-white font-black text-sm uppercase tracking-widest hover:bg-[#005a57] transition-all shadow-lg"
+             >
+               Lưu ghi chú
+             </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+// Add X icon to imports
+import { X } from "lucide-react";

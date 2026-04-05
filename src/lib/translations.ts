@@ -8,17 +8,38 @@ export const translations = {
       checkout: "Thanh toán",
       feedback: "Đánh giá",
       inventory: "Kho hàng",
+      reports: "Báo cáo",
       staff: "Nhân viên",
+      shifts: "Ca làm việc",
     },
     header: {
       searchPlaceholder: "Tìm bàn hoặc khách...",
-      shift: "Ca làm việc",
+      shift: "Ca làm",
+      shifts: "Danh sách ca",
+      currentShift: "Ca hiện tại",
+      register: "Đăng ký ca",
+      morning: "Sáng (Ca 1)",
+      afternoon: "Chiều (Ca 2)",
+      evening: "Tối (Ca 3)",
+      night: "Đêm (Ca 4)",
       notifications: "Thông báo",
       noNotifications: "Chưa có thông báo mới",
+      matchingTables: "Bàn phù hợp",
+      items: "món",
+      table: "Bàn",
+      quantity: "Số lượng",
+      pickupTip: "Vui lòng nhận món tại khu vực bếp",
+      allCaughtUp: "Tất cả đã hoàn thành!",
+      noReadyItems: "Chưa có món nào sẵn sàng.",
       serve: "Phục vụ",
       switchStaff: "Đổi nhân viên",
       logout: "Đăng xuất",
       shiftStarted: "Bắt đầu ca vào lúc",
+      roles: {
+        Waiter: "Phục vụ",
+        Manager: "Quản lý",
+        Chef: "Bếp trưởng"
+      }
     },
     settings: {
       title: "Cài đặt hệ thống",
@@ -37,6 +58,356 @@ export const translations = {
       cancel: "Hủy",
       clear: "Xóa",
       back: "Quay lại",
+    },
+    tableMapPage: {
+      statusEmpty: "TRỐNG",
+      statusOccupied: "ĐANG DÙNG",
+      statusBillPrinted: "CHỜ T.TOÁN",
+      statusReserved: "ĐÃ ĐẶT",
+      table: "Bàn",
+      activeTables: "Bàn hoạt động",
+      floorOverview: "Tổng quan khu vực",
+      realTimeStatus: "Trạng thái thực tế các bàn",
+      turnoverRate: "THỜI GIAN NGỒI TB",
+      waitlist: "DANH SÁCH CHỜ",
+      revenue: "DOANH THU",
+      avg: "trung bình",
+      transferTable: "Chuyển bàn",
+      switchView: "Đổi khu vực",
+      quickTakeaway: "Bán mang về",
+      confirmArrival: "Xác nhận khách đến",
+      keepReserved: "Giữ đặt bàn",
+      assignOpenMenu: "Gán khách & Mở thực đơn",
+      cancelSeating: "Hủy xếp chỗ",
+      paxLabel: "khách",
+      paxCount: "SỐ KHÁCH",
+      tapToType: "Chạm để nhập",
+      entryMode: "Chế độ nhập",
+      selectToMove: "Chọn bàn muốn chuyển",
+      movingTable: "Đang chuyển bàn",
+      selectDestination: "Chọn bàn đích",
+      transferStep1: "BƯỚC 1",
+      transferStep2: "BƯỚC 2",
+      confirmTransfer: "Xác nhận chuyển",
+      moveToTable: "Chuyển đến bàn",
+      transferConfirmTitle: "Xác nhận Chuyển bàn",
+      transferSubtitle: "Chuyển dữ liệu từ Bàn {source} sang Bàn {target}",
+      justStarted: "Vừa bắt đầu",
+      justArrived: "Vừa đến",
+      parties: "Lượt chờ",
+      floors: {
+        main: "Sảnh chính",
+        patio: "Sân vườn",
+        vip: "Phòng VIP",
+        takeaway: "Mang về"
+      }
+    },
+    reservationsPage: {
+      title: "Trung tâm Đặt chỗ",
+      subtitle: "Quản lý và ghi nhận thông tin đặt chỗ của khách",
+      sendingSms: "Đang gửi tin nhắn xác nhận cho khách...",
+      bookingSaved: "✓ Đã lưu đặt chỗ. Thông báo đã được gửi qua SMS và Email.",
+      statusQuiet: "Đang vắng",
+      statusModerate: "Bình thường",
+      statusHighDemand: "Đang đông đúc",
+      statusFull: "Hết chỗ",
+      calendar: {
+        selectYear: "Chọn Năm",
+        selectMonth: "Chọn Tháng",
+        backToCalendar: "Quay lại Lịch",
+        days: ["T2", "T3", "T4", "T5", "T6", "T7", "CN"],
+        months: ["Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6", "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"],
+        availableSlots: "Khung giờ trống"
+      },
+      form: {
+        title: "Đăng ký Đặt chỗ mới",
+        subtitle: "Điền thông tin để giữ chỗ cho khách",
+        guestName: "Tên khách hàng",
+        namePlaceholder: "VD: Nguyễn Văn A",
+        assignTable: "Gán bàn (Không bắt buộc)",
+        noTable: "Chưa gán bàn",
+        tablePrefix: "BÀN",
+        paxLabel: "Số khách (PAX)",
+        guestsSuffix: "khách",
+        timePreference: "Thời gian mong muốn",
+        notes: "Ghi chú & Yêu cầu đặc biệt",
+        notesPlaceholder: "Dị ứng, kỷ niệm, hoặc sở thích chỗ ngồi...",
+        confirmBtn: "Xác nhận Đặt chỗ",
+        notificationTip: "Một thông báo xác nhận sẽ được gửi đến số điện thoại của khách."
+      },
+      tablePicker: {
+        title: "Chọn bàn",
+        subtitle: "Chọn một bàn trống cho khách",
+        unassigned: "Chưa gán bàn",
+        unassignedTip: "Tùy chọn gán sau",
+        booked: "Đã đặt",
+        occupied: "Đang dùng",
+        available: "Trống",
+        footerTip: "* Các bàn đang có khách không thể chọn cho đặt chỗ mới."
+      },
+      paxPicker: {
+        title: "Chọn số khách",
+        titleTime: "Chọn thời gian",
+        close: "ĐÓNG",
+        tapToType: "Nhấn để nhập",
+        paxUnit: "KHÁCH"
+      }
+    },
+    kitchenPage: {
+      title: "Bếp",
+      subtitle: "đơn đang chế biến",
+      priorityView: "Xem ưu tiên",
+      internalNote: "Ghi chú nội bộ",
+      itemsUnit: "Món",
+      guestsUnit: "Khách",
+      justOrdered: "Vừa đặt",
+      preparing: "Đang nấu",
+      ready: "Đã xong",
+      prepareSelected: "Nấu ({n}) món đã chọn",
+      prepareAll: "Nấu tất cả",
+      readySelected: "Xong ({n}) món đã chọn",
+      readyAll: "Xong tất cả",
+      noActiveOrders: "Chưa có đơn mới",
+      waitingForTickets: "Đang chờ thông tin món từ quầy...",
+      pickupAt: "Lấy lúc"
+    },
+    checkoutPage: {
+      title: "Hóa đơn",
+      successTitle: "Thanh toán thành công",
+      successSubtitleFull: "Hóa đơn #{id} đã được thanh toán đầy đủ.",
+      successSubtitlePartial: "Đã xử lý thanh toán một phần thành công.",
+      perPerson: "MỖI NGƯỜI",
+      guests: "SỐ KHÁCH",
+      personsSuffix: "Khách",
+      oneOf: "1 TRÊN ",
+      noItemsSelected: "Chưa có món nào được chọn để tách.",
+      subtotal: "Tạm tính",
+      subtotalDivided: "Tạm tính (Đã chia)",
+      serviceCharge: "Phí phục vụ (5%)",
+      vatIncluded: "Đã bao gồm VAT (10%)",
+      total: "Tổng cộng",
+      paymentMethod: "PHƯƠNG THỨC THANH TOÁN",
+      methodCash: "Tiền mặt",
+      methodCard: "Thẻ ngân hàng",
+      methodWallet: "Ví điện tử",
+      completePayment: "Hoàn tất thanh toán",
+      printReceipt: "In biên lai",
+      emailInvoice: "Gửi Email",
+      splitBill: "Chia HĐ",
+      leaveFeedback: "Để lại đánh giá",
+      walletTitle: "Thanh toán Ví điện tử",
+      refreshQr: "Làm mới mã QR",
+      simulateSuccess: "Giả lập thành công",
+      splitModal: {
+        title: "Tách hóa đơn",
+        subtitle: "Điều chỉnh phương thức thanh toán",
+        equalSplit: "Chia đều",
+        itemizedSplit: "Theo món",
+        sharePerPerson: "Phần mỗi người",
+        itemsSelected: "{n} món đã chọn",
+        subtotalSection: "Tạm tính phần này",
+        confirmBtn: "Xác nhận chi tiết"
+      },
+      receipt: {
+        title: "HÓA ĐƠN",
+        address: "123 Đường Gourmet, Quận 1",
+        city: "TP. Hồ Chí Minh",
+        staff: "Nhân viên",
+        item: "MÓN",
+        qty: "SL",
+        total: "TỔNG",
+        thankYou: "Cảm ơn Quý khách!",
+        visitAgain: "Hẹn gặp lại Quý khách lần sau.",
+        qrPlaceholder: "Mã QR thanh toán"
+      }
+    },
+    feedbackPage: {
+      title: "Lịch sử Đánh giá",
+      subtitle: "Xem lại các phản hồi gần đây từ khách hàng hôm nay.",
+      newFeedback: "Đánh giá mới",
+      recentRatings: "Đánh giá gần đây",
+      viewAllHistory: "Xem tất cả lịch sử",
+      todayScore: "ĐIỂM HÔM NAY",
+      averageRating: "Điểm trung bình",
+      yesterdayTrend: "so với hôm qua",
+      reviewsCount: "Dựa trên {n} đánh giá hôm nay",
+      channelsTitle: "Kênh nhận xét",
+      dineIn: "Tại quán",
+      takeaway: "Mang về",
+      reviewsUnit: "đánh giá",
+      modal: {
+        title: "Trải nghiệm của bạn thế nào?",
+        subtitle: "Phản hồi của bạn giúp chúng tôi cải thiện dịch vụ tốt hơn.",
+        lowRatingMessage: "Rất tiếc vì trải nghiệm không tốt. Hãy cho chúng tôi biết bạn cần chúng tôi cải thiện điều gì.",
+        shareThoughts: "CHIA SẺ Ý KIẾN CỦA BẠN",
+        placeholder: "Hãy kể thêm về lần ghé thăm này của bạn...",
+        fullName: "Họ tên (Không bắt buộc)",
+        anonymous: "Khách hàng ẩn danh",
+        submitBtn: "Gửi phản hồi",
+        skipBtn: "Bỏ qua",
+        successTitle: "Cảm ơn bạn!",
+        successSubtitle: "Ý kiến đóng góp của bạn đã được ghi nhận."
+      },
+      time: {
+        now: "vừa xong",
+        minsAgo: "{n} phút trước",
+        hoursAgo: "{n} giờ trước"
+      }
+    },
+    inventoryPage: {
+      title: "Quản lý Kho hàng",
+      subtitle: "Quản lý tồn kho, nhà cung cấp và định mức nguyên liệu.",
+      manageBOM: "Định mức (BOM)",
+      generatePO: "Tạo Đơn mua hàng",
+      addStock: "Nhập kho",
+      lowStockLabel: "Mặt hàng sắp hết",
+      currentAssets: "Giá trị tồn hàng",
+      wastageReport: "Báo cáo hao hụt",
+      wastageSubtitle: "Lượng rác thải hữu cơ đã giảm 14% tuần này nhờ cải thiện định mức cá hồi.",
+      viewReport: "Xem báo cáo",
+      inventoryGridTitle: "Danh mục nguyên liệu",
+      lowStockAlert: "Sắp hết",
+      healthyStock: "Ổn định",
+      criticalStock: "Cần nhập gấp",
+      categories: {
+        all: "Tất cả",
+        seafood: "Hải sản",
+        produce: "Rau củ",
+        dairy: "Bơ sữa",
+        dry: "Hàng khô",
+        beverage: "Đồ uống"
+      },
+      units: {
+        kg: "kg",
+        liter: "lít",
+        bottle: "chai",
+        oz: "oz",
+        piece: "miếng",
+        bag: "túi"
+      },
+      bomModal: {
+        title: "Định mức (BOM)",
+        subtitle: "Cấu hình nguyên liệu cho thực đơn",
+        addItem: "Thêm thành phần",
+        saveBom: "Lưu định mức"
+      }
+    },
+    reportsPage: {
+      title: "Phân tích Kinh doanh",
+      subtitle: "Phân tích hiệu suất & khả năng sinh lời theo thời gian thực.",
+      timeRange: {
+        today: "Hôm nay",
+        week: "Tuần",
+        month: "Tháng"
+      },
+      stats: {
+        totalRevenue: "Tổng Doanh thu",
+        netProfit: "Lợi nhuận ròng",
+        profitMargin: "Biên lợi nhuận",
+        transactions: "Giao dịch"
+      },
+      charts: {
+        revenueStream: "Dòng doanh thu",
+        hourlyPerformance: "Hiệu suất theo giờ",
+        bestSellers: "Bán chạy nhất",
+        unitsSold: "món đã bán",
+        fullInventory: "Xem báo cáo kho chi tiết",
+        noData: "Chưa có dữ liệu"
+      },
+      insights: {
+        categorySplit: "Phân loại danh mục",
+        coffeeDriver: "Cà phê là nguồn doanh thu chính của bạn.",
+        signatureDrinks: "Thức uống đặc trưng chiếm 74% tổng doanh thu hôm nay. Hãy cân nhắc nhắc khách dùng thêm 'Đồ ăn nhẹ' vào buổi sáng.",
+        coffee: "Cà phê",
+        teas: "Trà",
+        bites: "Đồ ăn nhẹ"
+      }
+    },
+    orderMenuPage: {
+      currencySymbol: "đ",
+      priceScale: 25000,
+      categories: {
+        signature: "Cà phê đặc trưng",
+        teas: "Trà tuyển chọn",
+        bites: "Món ăn nhẹ"
+      },
+      tags: {
+        bestSeller: "BÁN CHẠY",
+        classic: "TRUYỀN THỐNG",
+        premium: "CAO CẤP",
+        organic: "NGUYÊN BẢN",
+        new: "MỚI"
+      },
+      items: {
+        latte: { name: "Latte Sữa Yến Mạch", desc: "Cà phê máy, sữa yến mạch nguyên bản" },
+        cortado: { name: "Cortado", desc: "Tỉ lệ cân bằng giữa espresso và sữa nóng" },
+        matcha: { name: "Trà Matcha Cao Cấp", desc: "Nguồn gốc Uji, đánh tay truyền thống" },
+        toast: { name: "Bánh Mì Nướng Sourdough", desc: "Bơ sáp & hạt nguyên bản" },
+        croissant: { name: "Bánh Sừng Bò Bơ", desc: "Lên men kép, bơ Pháp cao cấp" }
+      },
+      cart: {
+        table: "Bàn",
+        guests: "Khách",
+        new: "Mới",
+        waiting: "Chờ xác nhận",
+        confirmed: "Đã xác nhận",
+        cooking: "Đang chế biến",
+        ready: "Sẵn sàng",
+        itemsLabel: "Món",
+        addNote: "Thêm ghi chú (VD: Ít đá...)",
+        noteLabel: "Ghi chú:",
+        emptyMsg: "Chọn món\nđể bắt đầu đặt hàng",
+        subtotal: "Tạm tính",
+        tax: "Thuế",
+        total: "Tổng cộng",
+        printBill: "In hóa đơn tạm tính",
+        sendToKitchen: "Gửi món đến bếp"
+      }
+    },
+    loginPage: {
+      title: "Đăng nhập Nhân viên",
+      subtitle: "Vui lòng nhập mã PIN nhân viên để bắt đầu phục vụ",
+      branding: "Hệ thống POS Organic Elevated"
+    },
+    staffPage: {
+      title: "Quản lý Nhân sự",
+      subtitle: "Quản lý đội ngũ nhân viên và phân quyền truy cập",
+      addStaff: "Thêm nhân viên",
+      editStaff: "Sửa thông tin",
+      deleteStaff: "Xóa nhân viên",
+      roles: {
+        Waiter: "Phục vụ",
+        Manager: "Quản lý",
+        Chef: "Đầu bếp"
+      },
+      form: {
+        name: "Họ và tên",
+        pin: "Mã PIN (4 chữ số)",
+        role: "Chức vụ",
+        save: "Lưu thay đổi",
+        cancel: "Hủy bỏ"
+      }
+    },
+    menuManagementPage: {
+      title: "Quản lý Thực đơn",
+      subtitle: "Thêm, sửa hoặc tạm ngưng các món ăn trong thực đơn",
+      addDish: "Thêm món mới",
+      editDish: "Sửa món ăn",
+      deleteDish: "Xóa món",
+      status: {
+        available: "Đang phục vụ",
+        outOfStock: "Hết hàng"
+      },
+      form: {
+        name: "Tên món",
+        category: "Danh mục",
+        price: "Giá bán",
+        description: "Mô tả món",
+        tag: "Nhãn (Best Seller, New...)",
+        type: "Loại (Đồ uống, Thức ăn)",
+        save: "Lưu món ăn",
+        cancel: "Hủy bỏ"
+      }
     }
   },
   en: {
@@ -48,17 +419,38 @@ export const translations = {
       checkout: "Checkout",
       feedback: "Feedback",
       inventory: "Inventory",
+      reports: "Reports",
       staff: "Staff",
+      shifts: "Shifts",
     },
     header: {
       searchPlaceholder: "Search tables or guests...",
       shift: "Shift",
+      shifts: "Shift List",
+      currentShift: "Current Shift",
+      register: "Register Shift",
+      morning: "Morning (S1)",
+      afternoon: "Afternoon (S2)",
+      evening: "Evening (S3)",
+      night: "Night (S4)",
       notifications: "Notifications",
-      noNotifications: "All caught up!",
+      noNotifications: "No new notifications",
+      matchingTables: "Matching Tables",
+      items: "items",
+      table: "Table",
+      quantity: "Quantity",
+      pickupTip: "Please pick up items at the kitchen",
+      allCaughtUp: "All caught up!",
+      noReadyItems: "No items ready for pickup.",
       serve: "Serve",
       switchStaff: "Switch Staff",
-      logout: "Logout Session",
+      logout: "Logout",
       shiftStarted: "Shift started at",
+      roles: {
+        Waiter: "Waiter",
+        Manager: "Manager",
+        Chef: "Chef"
+      }
     },
     settings: {
       title: "System Settings",
@@ -77,6 +469,356 @@ export const translations = {
       cancel: "Cancel",
       clear: "Clear",
       back: "Back",
+    },
+    tableMapPage: {
+      statusEmpty: "EMPTY",
+      statusOccupied: "OCCUPIED",
+      statusBillPrinted: "BILL PRINTED",
+      statusReserved: "RESERVED",
+      table: "Table",
+      activeTables: "Tables Active",
+      floorOverview: "Floor Overview",
+      realTimeStatus: "Real-time status of dining zones",
+      turnoverRate: "AVG STAY TIME",
+      waitlist: "WAITLIST",
+      revenue: "REVENUE",
+      avg: "avg",
+      transferTable: "Transfer Table",
+      switchView: "Switch View",
+      quickTakeaway: "Quick Takeaway",
+      confirmArrival: "Confirm Arrival",
+      keepReserved: "Keep reserved",
+      assignOpenMenu: "Assign & Open Menu",
+      cancelSeating: "Cancel seating",
+      paxLabel: "Guests",
+      paxCount: "PAX COUNT",
+      tapToType: "Tap to type",
+      entryMode: "Entry Mode",
+      selectToMove: "Select a table to move",
+      movingTable: "Moving Table",
+      selectDestination: "Select destination",
+      transferStep1: "STEP 1",
+      transferStep2: "STEP 2",
+      confirmTransfer: "Confirm Transfer",
+      moveToTable: "Move to Table",
+      transferConfirmTitle: "Confirm Table Transfer",
+      transferSubtitle: "Transfer data from Table {source} to Table {target}",
+      justStarted: "Just Started",
+      justArrived: "Just Arrived",
+      parties: "Waitlist Groups",
+      floors: {
+        main: "Main Dining Room",
+        patio: "Patio Terrace",
+        vip: "VIP Room",
+        takeaway: "Takeaway Counter"
+      }
+    },
+    reservationsPage: {
+      title: "Reservations Hub",
+      subtitle: "Capture every guest booking with ease",
+      sendingSms: "Sending confirmation SMS to guest...",
+      bookingSaved: "✓ Booking Saved. Confirmation sent via SMS and Email.",
+      statusQuiet: "Quiet",
+      statusModerate: "Moderate",
+      statusHighDemand: "High Demand",
+      statusFull: "Fully Booked",
+      calendar: {
+        selectYear: "Select Year",
+        selectMonth: "Select Month",
+        backToCalendar: "Back to Calendar",
+        days: ["MO", "TU", "WE", "TH", "FR", "SA", "SU"],
+        months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+        availableSlots: "Available Slots"
+      },
+      form: {
+        title: "New Reservation",
+        subtitle: "Fill in the details to secure the table",
+        guestName: "Guest Name",
+        namePlaceholder: "e.g. Julianne Moore",
+        assignTable: "Assign Table (Optional)",
+        noTable: "No Table Assigned",
+        tablePrefix: "TABLE",
+        paxLabel: "PAX (Number of Guests)",
+        guestsSuffix: "Guests",
+        timePreference: "Time Preference",
+        notes: "Notes & Special Requests",
+        notesPlaceholder: "Allergies, anniversaries, or seating preferences...",
+        confirmBtn: "Confirm Booking",
+        notificationTip: "By confirming, a notification will be sent to the guest's contact number."
+      },
+      tablePicker: {
+        title: "Select Table",
+        subtitle: "Choose an available spot for your guest",
+        unassigned: "Unassigned",
+        unassignedTip: "Flexible seating later",
+        booked: "Booked",
+        occupied: "Occupied",
+        available: "Available",
+        footerTip: "* Occupied tables cannot be selected for new reservations."
+      },
+      paxPicker: {
+        title: "Select Guest Count",
+        titleTime: "Select Preferred Time",
+        close: "CLOSE",
+        tapToType: "Tap to type",
+        paxUnit: "PAXS"
+      }
+    },
+    kitchenPage: {
+      title: "Kitchen",
+      subtitle: "orders in preparation",
+      priorityView: "Priority View",
+      internalNote: "Internal Note",
+      itemsUnit: "Items",
+      guestsUnit: "Guests",
+      justOrdered: "Just Ordered",
+      preparing: "Preparing",
+      ready: "Ready",
+      prepareSelected: "Prepare ({n}) Selected",
+      prepareAll: "Prepare All",
+      readySelected: "Ready ({n}) Selected",
+      readyAll: "Ready All",
+      noActiveOrders: "No Active Orders",
+      waitingForTickets: "Waiting for tickets from the POS...",
+      pickupAt: "Pickup at"
+    },
+    checkoutPage: {
+      title: "Invoice",
+      successTitle: "Payment Successful",
+      successSubtitleFull: "Invoice #{id} has been paid in full.",
+      successSubtitlePartial: "Partial payment processed successfully.",
+      perPerson: "PER PERSON",
+      guests: "GUESTS",
+      personsSuffix: "Persons",
+      oneOf: "1 OF ",
+      noItemsSelected: "No items selected for this split.",
+      subtotal: "Subtotal",
+      subtotalDivided: "Subtotal (Divided)",
+      serviceCharge: "Service Charge (5%)",
+      vatIncluded: "VAT Included (10%)",
+      total: "Total",
+      paymentMethod: "PAYMENT METHOD",
+      methodCash: "Cash",
+      methodCard: "Credit Card",
+      methodWallet: "E-Wallet",
+      completePayment: "Complete Payment",
+      printReceipt: "Print Receipt",
+      emailInvoice: "Email Invoice",
+      splitBill: "Split Bill",
+      leaveFeedback: "Leave Feedback",
+      walletTitle: "E-Wallet Payment",
+      refreshQr: "Refresh QR Code",
+      simulateSuccess: "Simulate Success",
+      splitModal: {
+        title: "Split Bill",
+        subtitle: "Adjust your payment strategy",
+        equalSplit: "Equal Split",
+        itemizedSplit: "By Items",
+        sharePerPerson: "Share Per Person",
+        itemsSelected: "{n} items selected",
+        subtotalSection: "Subtotal Section",
+        confirmBtn: "Confirm Payment Detail"
+      },
+      receipt: {
+        title: "RECEIPT",
+        address: "123 Gourmet Street, District 1",
+        city: "Ho Chi Minh City, VN",
+        staff: "Staff",
+        item: "ITEM",
+        qty: "QTY",
+        total: "TOTAL",
+        thankYou: "Thank You!",
+        visitAgain: "Please visit us again.",
+        qrPlaceholder: "QR Placeholder"
+      }
+    },
+    feedbackPage: {
+      title: "Feedback History",
+      subtitle: "Reviewing recent guest submissions for today.",
+      newFeedback: "New Feedback",
+      recentRatings: "Recent Ratings",
+      viewAllHistory: "View All History",
+      todayScore: "TODAY'S SCORE",
+      averageRating: "Average Rating",
+      yesterdayTrend: "from yesterday",
+      reviewsCount: "Based on {n} reviews today",
+      channelsTitle: "Review Channels",
+      dineIn: "Dine-in",
+      takeaway: "Takeaway",
+      reviewsUnit: "reviews",
+      modal: {
+        title: "How was your experience?",
+        subtitle: "Your feedback helps us grow and serve you better.",
+        lowRatingMessage: "We're sorry for the poor experience. Please let us know how we can improve.",
+        shareThoughts: "SHARE YOUR THOUGHTS",
+        placeholder: "Tell us more about your visit...",
+        fullName: "Full Name (Optional)",
+        anonymous: "Anonymous Customer",
+        submitBtn: "Submit Feedback",
+        skipBtn: "Skip for now",
+        successTitle: "Thank You!",
+        successSubtitle: "Your feedback has been recorded."
+      },
+      time: {
+        now: "just now",
+        minsAgo: "{n} minutes ago",
+        hoursAgo: "{n} hours ago"
+      }
+    },
+    inventoryPage: {
+      title: "Inventory Dashboard",
+      subtitle: "Manage your stock levels, suppliers, and BOM formulas.",
+      manageBOM: "Manage BOM Formulas",
+      generatePO: "Generate Purchase Order",
+      addStock: "Add Stock",
+      lowStockLabel: "Low Stock Items",
+      currentAssets: "Current Assets",
+      wastageReport: "Wastage Report",
+      wastageSubtitle: "Your organic waste has decreased by 14% this week due to improved salmon portioning.",
+      viewReport: "View Report",
+      inventoryGridTitle: "Ingredients List",
+      lowStockAlert: "Low Stock",
+      healthyStock: "Healthy",
+      criticalStock: "Critical",
+      categories: {
+        all: "All",
+        seafood: "Seafood",
+        produce: "Produce",
+        dairy: "Dairy",
+        dry: "Dry Goods",
+        beverage: "Beverage"
+      },
+      units: {
+        kg: "kg",
+        liter: "liter",
+        bottle: "bottle",
+        oz: "oz",
+        piece: "piece",
+        bag: "bag"
+      },
+      bomModal: {
+        title: "BOM Formulas",
+        subtitle: "Configure ingredient components",
+        addItem: "Add Component",
+        saveBom: "Save BOM"
+      }
+    },
+    reportsPage: {
+      title: "Business Intelligence",
+      subtitle: "Performance analytics & real-time profitability.",
+      timeRange: {
+        today: "Today",
+        week: "Week",
+        month: "Month"
+      },
+      stats: {
+        totalRevenue: "Total Revenue",
+        netProfit: "Net Profit",
+        profitMargin: "Profit Margin",
+        transactions: "Transactions"
+      },
+      charts: {
+        revenueStream: "Revenue Stream",
+        hourlyPerformance: "Hourly Performance",
+        bestSellers: "Best Sellers",
+        unitsSold: "units sold",
+        fullInventory: "Full Inventory Report",
+        noData: "No data available"
+      },
+      insights: {
+        categorySplit: "Category Split",
+        coffeeDriver: "Coffee is your core driver.",
+        signatureDrinks: "Signature Drinks account for 74% of total revenue today. Consider upselling 'Artisanal Bites' during morning.",
+        coffee: "Coffee",
+        teas: "Teas",
+        bites: "Bites"
+      }
+    },
+    orderMenuPage: {
+      currencySymbol: "$",
+      priceScale: 1,
+      categories: {
+        signature: "Signature Coffee",
+        teas: "Hand-picked Teas",
+        bites: "Artisanal Bites"
+      },
+      tags: {
+        bestSeller: "BEST SELLER",
+        classic: "CLASSIC",
+        premium: "PREMIUM",
+        organic: "ORGANIC",
+        new: "NEW"
+      },
+      items: {
+        latte: { name: "Oat Milk Latte", desc: "Double shot, organic oat milk" },
+        cortado: { name: "Cortado", desc: "Equal parts espresso and milk" },
+        matcha: { name: "Ceremonial Matcha", desc: "Uji source, hand-whisked" },
+        toast: { name: "Sourdough Toast", desc: "Avocado & organic seeds" },
+        croissant: { name: "Butter Croissant", desc: "Double fermented, French butter" }
+      },
+      cart: {
+        table: "Table",
+        guests: "Guests",
+        new: "New",
+        waiting: "Waiting for confirmation",
+        confirmed: "Order confirmed",
+        cooking: "Cooking",
+        ready: "Ready",
+        itemsLabel: "Items",
+        addNote: "Add note (e.g. Less ice)",
+        noteLabel: "Note:",
+        emptyMsg: "Click a menu item\nto start ordering",
+        subtotal: "Subtotal",
+        tax: "Tax",
+        total: "Total",
+        printBill: "Print Provisional Bill",
+        sendToKitchen: "Send to Kitchen"
+      }
+    },
+    loginPage: {
+      title: "Staff Login",
+      subtitle: "Please enter your 4-digit staff access code to start the service",
+      branding: "The Elevated Organic POS System"
+    },
+    staffPage: {
+      title: "Staff Management",
+      subtitle: "Manage your team and access permissions",
+      addStaff: "Add Staff",
+      editStaff: "Edit Info",
+      deleteStaff: "Remove Staff",
+      roles: {
+        Waiter: "Waiter",
+        Manager: "Manager",
+        Chef: "Chef"
+      },
+      form: {
+        name: "Full Name",
+        pin: "PIN Code (4 digits)",
+        role: "Role",
+        save: "Save Changes",
+        cancel: "Cancel"
+      }
+    },
+    menuManagementPage: {
+      title: "Menu Management",
+      subtitle: "Add, edit, or toggle availability of your menu items",
+      addDish: "Add New Dish",
+      editDish: "Edit Dish",
+      deleteDish: "Delete Dish",
+      status: {
+        available: "Available",
+        outOfStock: "Out of Stock"
+      },
+      form: {
+        name: "Dish Name",
+        category: "Category",
+        price: "Price",
+        description: "Description",
+        tag: "Tag (Best Seller, New...)",
+        type: "Type (Drink, Food)",
+        save: "Save Dish",
+        cancel: "Cancel"
+      }
     }
   }
 };

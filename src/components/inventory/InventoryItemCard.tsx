@@ -3,6 +3,8 @@
 import React from "react";
 import { Plus, Coffee, Milk, Droplets, Egg, Beef, Leaf } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSettingsStore } from "@/store/settingsStore";
+import { translations } from "@/lib/translations";
 
 export type InventoryStatus = "healthy" | "warning" | "critical";
 
@@ -31,6 +33,9 @@ export function InventoryItemCard({
   isAddPlaceholder,
   onClick
 }: InventoryItemCardProps) {
+  const { language } = useSettingsStore();
+  const t = translations[language].inventoryPage;
+
   if (isAddPlaceholder) {
     return (
       <button 
@@ -41,7 +46,7 @@ export function InventoryItemCard({
           <Plus size={28} />
         </div>
         <span className="text-sm font-black text-outline group-hover:text-on-surface transition-colors">
-          Track New Ingredient
+          {t.addStock}
         </span>
       </button>
     );
@@ -50,6 +55,11 @@ export function InventoryItemCard({
   const isHealthy = status === "healthy";
   const isWarning = status === "warning";
   const isCritical = status === "critical";
+
+  // Đảm bảo số lượng hiển thị gọn gàng (tối đa 2 chữ số thập phân, không có số 0 thừa)
+  const formattedValue = typeof value === "number" 
+    ? parseFloat(value.toFixed(2)).toLocaleString(language === 'vi' ? 'vi-VN' : 'en-US') 
+    : value;
 
   return (
     <div className="group h-[220px] bg-white rounded-[32px] p-6 shadow-sm border border-surface-container-low transition-all duration-300 hover:shadow-ambient flex flex-col justify-between">
@@ -72,7 +82,7 @@ export function InventoryItemCard({
         </div>
         
         <div className="text-right">
-          <p className="text-2xl font-black text-on-surface tracking-tighter leading-none">{value}</p>
+          <p className="text-2xl font-black text-on-surface tracking-tighter leading-none">{formattedValue}</p>
           <span className="text-[10px] font-black uppercase tracking-widest text-outline">{unit}</span>
         </div>
       </div>
@@ -80,14 +90,14 @@ export function InventoryItemCard({
       {/* Footer: Progress & Status */}
       <div className="space-y-4">
         <div className="flex justify-between items-end">
-           <span className="text-[10px] font-black uppercase tracking-widest text-on-surface/40">STOCK LEVEL</span>
+           <span className="text-[10px] font-black uppercase tracking-widest text-on-surface/40">MỨC TỒN KHO</span>
            <span className={cn(
              "text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md",
              isHealthy && "text-primary",
              isWarning && "text-brand-gold",
              isCritical && "text-brand-coral"
            )}>
-             {percentage}% {status.charAt(0).toUpperCase() + status.slice(1)}
+             {percentage}% {status === "healthy" ? t.healthyStock : status === "warning" ? t.lowStockAlert : t.criticalStock}
            </span>
         </div>
         

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
+import { supabase } from "@/lib/supabase";
 
 export type TableStatus = "empty" | "occupied" | "bill-printed" | "reserved";
 
@@ -41,280 +41,229 @@ export interface Table {
   reservationId?: string;
 }
 
-interface TableStore {
-  floors: { name: string; tables: Table[] }[];
-  reservations: Reservation[];
-  setFloors: (floors: { name: string; tables: Table[] }[]) => void;
-  updateTable: (floorIndex: number, tableId: string, updates: Partial<Table>) => void;
-  addOrderItem: (tableId: string, item: Omit<OrderItem, "cartId" | "status" | "timestamp">) => void;
-  updateItemStatus: (tableId: string, cartId: string, status: OrderItem["status"]) => void;
-  updateItemNote: (tableId: string, cartId: string, notes: string) => void;
-  confirmOrders: (tableId: string) => void;
-  clearOrders: (tableId: string) => void;
-  markAsServed: (tableId: string, cartId: string) => void;
-  addReservation: (res: Omit<Reservation, "id" | "status">) => void;
-  assignTable: (resId: string, tableId: string) => void;
-  seatReservation: (resId: string) => void;
+export interface Floor {
+  id: string;
+  name: string;
+  tables: Table[];
 }
 
-const INITIAL_RESERVATIONS: Reservation[] = [
-  {
-    id: "res-smith-10",
-    guestName: "Smith Party",
-    pax: 4,
-    date: "2023-10-24",
-    time: "7:30 PM",
-    status: "pending",
-    tableId: "10"
-  }
-];
+interface TableStore {
+  floors: Floor[];
+  reservations: Reservation[];
+  loading: boolean;
+  
+  // Actions
+  fetchInitialData: () => Promise<void>;
+  initializeRealtime: () => (() => void);
+  setFloors: (floors: Floor[]) => void;
+  updateTable: (floorIndex: number, tableId: string, updates: Partial<Table>) => Promise<void>;
+  addOrderItem: (tableId: string, item: Omit<OrderItem, "cartId" | "status" | "timestamp">) => Promise<void>;
+  updateItemStatus: (tableId: string, cartId: string, status: OrderItem["status"]) => Promise<void>;
+  updateItemNote: (tableId: string, cartId: string, notes: string) => Promise<void>;
+  confirmOrders: (tableId: string) => Promise<void>;
+  clearOrders: (tableId: string) => Promise<void>;
+  markAsServed: (tableId: string, cartId: string) => Promise<void>;
+  addReservation: (res: Omit<Reservation, "id" | "status">) => Promise<void>;
+  assignTable: (resId: string, tableId: string) => Promise<void>;
+  seatReservation: (resId: string) => Promise<void>;
+  transferTable: (floorIndex: number, sourceId: string, destId: string) => Promise<void>;
+  deductInventory: (tableId: string) => Promise<void>;
+}
 
-const INITIAL_FLOORS = [
-  { 
-    name: "Main Dining Room", 
-    tables: [
-      { id: "4", number: "04", status: "occupied", guests: 3, timeElapsed: "45M", orders: [] },
-      { id: "8", number: "08", status: "empty", orders: [] },
-      { id: "2", number: "02", status: "bill-printed", guests: 4, timeElapsed: "1H 20M", orders: [] },
-      { id: "10", number: "10", status: "reserved", pax: 4, reservedTime: "7:30 PM", reservedBy: "Smith Party", orders: [], reservationId: "res-smith-10" },
-      { id: "1", number: "01", status: "empty", orders: [] },
-      { id: "3", number: "03", status: "occupied", guests: 2, timeElapsed: "12M", orders: [] },
-      { id: "5", number: "05", status: "empty", orders: [] },
-      { id: "12", number: "12", status: "empty", orders: [] },
-    ] as Table[]
-  },
-  { 
-    name: "Patio Terrace", 
-    tables: [
-      { id: "21", number: "21", status: "empty", orders: [] },
-      { id: "22", number: "22", status: "occupied", guests: 2, timeElapsed: "15M", orders: [] },
-      { id: "23", number: "23", status: "empty", orders: [] },
-      { id: "24", number: "24", status: "empty", orders: [] },
-      { id: "25", number: "25", status: "empty", orders: [] },
-      { id: "26", number: "26", status: "empty", orders: [] },
-    ] as Table[]
-  },
-  { 
-    name: "VIP Lounge", 
-    tables: [
-      { id: "V1", number: "V1", status: "empty", orders: [] },
-      { id: "V2", number: "V2", status: "occupied", guests: 6, timeElapsed: "1H", orders: [] },
-      { id: "V3", number: "V3", status: "empty", orders: [] },
-    ] as Table[]
-  },
-  { 
-    name: "Direct Orders", 
-    tables: [
-      { id: "TAKEAWAY", number: "TW", status: "empty", orders: [] },
-    ] as Table[]
-  }
-];
+export const useTableStore = create<TableStore>((set, get) => ({
+  floors: [],
+  reservations: [],
+  loading: false,
 
-export const useTableStore = create<TableStore>()(
-  persist(
-    (set) => ({
-      floors: INITIAL_FLOORS,
-      reservations: INITIAL_RESERVATIONS,
-      
-      setFloors: (floors: { name: string; tables: Table[] }[]) => set({ floors }),
-      
-      updateTable: (floorIndex: number, tableId: string, updates: Partial<Table>) => 
-        set((state: TableStore) => {
-          const newFloors = [...state.floors];
-          const tableIndex = newFloors[floorIndex].tables.findIndex(t => t.id === tableId);
-          if (tableIndex !== -1) {
-            newFloors[floorIndex].tables[tableIndex] = { 
-              ...newFloors[floorIndex].tables[tableIndex], 
-              ...updates 
-            };
-          }
-          return { floors: newFloors };
-        }),
+  fetchInitialData: async () => {
+    set({ loading: true });
+    
+    // Fetch Floors
+    const { data: floorsData } = await supabase.from('floors').select('*');
+    // Fetch Tables
+    const { data: tablesData } = await supabase.from('tables').select('*');
+    // Fetch Orders
+    const { data: ordersData } = await supabase.from('orders').select('*');
+    // Fetch Reservations
+    const { data: resData } = await supabase.from('reservations').select('*');
 
-      addOrderItem: (tableId: string, item: Omit<OrderItem, "cartId" | "status" | "timestamp">) => 
-        set((state: TableStore) => {
-          const newFloors = [...state.floors];
-          let foundTable: Table | undefined;
-          for (const floor of newFloors) {
-            foundTable = floor.tables.find(t => t.id === tableId || t.number === tableId);
-            if (foundTable) break;
-          }
-          if (foundTable) {
-            const existingPending = foundTable.orders.find(o => o.id === item.id && o.status === "pending");
-            if (existingPending) {
-              existingPending.quantity += 1;
-            } else {
-              foundTable.orders.push({
-                ...item,
-                cartId: Math.random().toString(36).substring(7),
-                status: "pending",
-                timestamp: Date.now()
-              });
-            }
-          }
-          return { floors: newFloors };
-        }),
-
-      updateItemStatus: (tableId: string, cartId: string, status: OrderItem["status"]) => 
-        set((state: TableStore) => {
-          const newFloors = [...state.floors];
-          for (const floor of newFloors) {
-            const table = floor.tables.find(t => t.id === tableId || t.number === tableId);
-            if (table) {
-              const item = table.orders.find(o => o.cartId === cartId);
-              if (item) item.status = status;
-            }
-          }
-          return { floors: newFloors };
-        }),
-
-      updateItemNote: (tableId: string, cartId: string, notes: string) => 
-        set((state: TableStore) => {
-          const newFloors = [...state.floors];
-          for (const floor of newFloors) {
-            const table = floor.tables.find(t => t.id === tableId || t.number === tableId);
-            if (table) {
-              const item = table.orders.find(o => o.cartId === cartId);
-              if (item) item.notes = notes;
-            }
-          }
-          return { floors: newFloors };
-        }),
-
-      confirmOrders: (tableId: string) => 
-        set((state: TableStore) => {
-          const newFloors = [...state.floors];
-          for (const floor of newFloors) {
-            const table = floor.tables.find(t => t.id === tableId || t.number === tableId);
-            if (table) {
-              table.orders.forEach(o => {
-                if (o.status === "pending") o.status = "sent";
-              });
-            }
-          }
-          return { floors: newFloors };
-        }),
-
-      clearOrders: (tableId: string) => 
-        set((state: TableStore) => {
-          const newFloors = [...state.floors];
-          for (const floor of newFloors) {
-            const table = floor.tables.find(t => t.id === tableId || t.number === tableId);
-            if (table) table.orders = [];
-          }
-          return { floors: newFloors };
-        }),
-
-      markAsServed: (tableId: string, cartId: string) => 
-        set((state: TableStore) => {
-          const newFloors = [...state.floors];
-          for (const floor of newFloors) {
-            const table = floor.tables.find(t => t.id === tableId || t.number === tableId);
-            if (table) {
-              const item = table.orders.find(o => o.cartId === cartId);
-              if (item) item.status = "served";
-            }
-          }
-          return { floors: newFloors };
-        }),
-
-      addReservation: (res: Omit<Reservation, "id" | "status">) => 
-        set((state: TableStore) => {
-          const newId = Math.random().toString(36).substring(7);
-          const newRes: Reservation = {
-            ...res,
-            id: newId,
-            status: "pending"
-          };
-          
-          let nextFloors = state.floors;
-          if (res.tableId) {
-            nextFloors = state.floors.map(floor => ({
-              ...floor,
-              tables: floor.tables.map(table => 
-                table.id === res.tableId 
-                  ? { 
-                      ...table, 
-                      status: "reserved" as TableStatus, 
-                      reservationId: newId,
-                      reservedBy: res.guestName,
-                      reservedTime: res.time,
-                      pax: res.pax
-                    } 
-                  : table
-              )
-            }));
-          }
-
-          return {
-            reservations: [...state.reservations, newRes],
-            floors: nextFloors
-          };
-        }),
-
-      assignTable: (resId: string, tableId: string) => 
-        set((state: TableStore) => {
-          const newReservations = state.reservations.map(r => 
-            r.id === resId ? { ...r, tableId } : r
-          );
-          const res = state.reservations.find(r => r.id === resId);
-          if (!res) return {};
-
-          const newFloors = state.floors.map(floor => ({
-            ...floor,
-            tables: floor.tables.map(table => 
-              table.id === tableId 
-                ? { 
-                    ...table, 
-                    status: "reserved" as TableStatus, 
-                    reservationId: resId,
-                    reservedBy: res.guestName,
-                    reservedTime: res.time,
-                    pax: res.pax
-                  } 
-                : table
-            )
-          }));
-
-          return {
-            reservations: newReservations,
-            floors: newFloors
-          };
-        }),
-
-      seatReservation: (resId: string) => 
-        set((state: TableStore) => {
-          const reservation = state.reservations.find(r => r.id === resId);
-          if (!reservation || !reservation.tableId) return {};
-
-          const newReservations = state.reservations.map(r => 
-            r.id === resId ? { ...r, status: "seated" as const } : r
-          );
-
-          const newFloors = state.floors.map(floor => ({
-            ...floor,
-            tables: floor.tables.map(table => 
-              table.id === reservation.tableId 
-                ? { 
-                    ...table, 
-                    status: "occupied" as TableStatus, 
-                    guests: reservation.pax,
-                    timeElapsed: "Just Arrived",
-                    reservationId: undefined
-                  } 
-                : table
-            )
-          }));
-
-          return {
-            reservations: newReservations,
-            floors: newFloors
-          };
-        }),
-    }),
-    {
-      name: "elevated-pos-tables",
-      storage: createJSONStorage(() => localStorage),
+    if (floorsData && tablesData) {
+      const floorsWithTables = floorsData.map(floor => ({
+        ...floor,
+        tables: tablesData
+          .filter(table => table.floor_id === floor.id)
+          .map(table => ({
+            ...table,
+            timeElapsed: table.time_elapsed,
+            orders: ordersData 
+              ? ordersData
+                  .filter(o => o.table_id === table.id)
+                  .map(o => ({
+                    id: o.menu_item_id,
+                    name: o.name || "Unknown",
+                    price: o.price || 0,
+                    cartId: o.id,
+                    quantity: o.quantity,
+                    status: o.status,
+                    notes: o.notes,
+                    timestamp: new Date(o.created_at).getTime()
+                  }))
+              : []
+          }))
+      }));
+      set({ floors: floorsWithTables, reservations: resData || [], loading: false });
     }
-  )
-);
+  },
+
+  initializeRealtime: () => {
+    const tablesChannel = supabase.channel('tables_realtime')
+      .on('postgres_changes', { event: '*', table: 'tables', schema: 'public' }, () => get().fetchInitialData())
+      .subscribe();
+
+    const ordersChannel = supabase.channel('orders_realtime')
+      .on('postgres_changes', { event: '*', table: 'orders', schema: 'public' }, () => get().fetchInitialData())
+      .subscribe();
+    
+    const resChannel = supabase.channel('res_realtime')
+      .on('postgres_changes', { event: '*', table: 'reservations', schema: 'public' }, () => get().fetchInitialData())
+      .subscribe();
+
+    const inventoryChannel = supabase.channel('inventory_realtime')
+      .on('postgres_changes', { event: '*', table: 'ingredients', schema: 'public' }, () => get().fetchInitialData())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(tablesChannel);
+      supabase.removeChannel(ordersChannel);
+      supabase.removeChannel(resChannel);
+      supabase.removeChannel(inventoryChannel);
+    };
+  },
+
+  setFloors: (floors) => set({ floors }),
+
+  updateTable: async (floorIndex, tableId, updates) => {
+    const dbUpdates: any = { ...updates };
+    if (updates.timeElapsed) dbUpdates.time_elapsed = updates.timeElapsed;
+    delete dbUpdates.orders;
+
+    await supabase.from('tables').update(dbUpdates).eq('id', tableId);
+  },
+
+  addOrderItem: async (tableId, item) => {
+    await supabase.from('orders').insert([{
+      table_id: tableId,
+      menu_item_id: item.id,
+      name: item.name,
+      price: item.price,
+      quantity: item.quantity,
+      status: 'pending',
+      notes: ''
+    }]);
+  },
+
+  updateItemStatus: async (tableId, cartId, status) => {
+    await supabase.from('orders').update({ status }).eq('id', cartId);
+  },
+
+  updateItemNote: async (tableId, cartId, notes) => {
+    await supabase.from('orders').update({ notes }).eq('id', cartId);
+  },
+
+  confirmOrders: async (tableId) => {
+    const { data } = await supabase.from('orders').select('id').eq('table_id', tableId).eq('status', 'pending');
+    if (data && data.length > 0) {
+      await supabase.from('orders').update({ status: 'sent' }).in('id', data.map(o => o.id));
+    }
+  },
+
+  deductInventory: async (tableId) => {
+    // 1. Lấy tất cả các món ăn trong đơn hàng của bàn này
+    const { data: orders } = await supabase
+      .from('orders')
+      .select('menu_item_id, quantity')
+      .eq('table_id', tableId);
+
+    if (!orders || orders.length === 0) return;
+
+    // 2. Với mỗi món ăn, lấy định mức (BOM) tương ứng
+    for (const order of orders) {
+      const { data: bom } = await supabase
+        .from('bom_recipe')
+        .select('ingredient_id, quantity_used')
+        .eq('product_id', order.menu_item_id);
+
+      if (bom && bom.length > 0) {
+        // 3. Thực hiện trừ tồn kho cho từng nguyên liệu
+        for (const recipe of bom) {
+          const totalDeduction = recipe.quantity_used * order.quantity;
+          
+          // Lấy tồn kho hiện tại
+          const { data: ingredient } = await supabase
+            .from('ingredients')
+            .select('current_stock')
+            .eq('id', recipe.ingredient_id)
+            .single();
+
+          if (ingredient) {
+            const newStock = Math.max(0, Number(ingredient.current_stock) - totalDeduction);
+            await supabase
+              .from('ingredients')
+              .update({ current_stock: newStock })
+              .eq('id', recipe.ingredient_id);
+          }
+        }
+      }
+    }
+  },
+
+  clearOrders: async (tableId) => {
+     // Trước khi xóa đơn hàng và làm trống bàn, thực hiện trừ tồn kho tự động
+     await get().deductInventory(tableId);
+
+     await supabase.from('orders').delete().eq('table_id', tableId);
+     await supabase.from('tables').update({ status: 'empty', guests: 0, time_elapsed: null }).eq('id', tableId);
+  },
+
+  markAsServed: async (tableId, cartId) => {
+    await supabase.from('orders').update({ status: 'served' }).eq('id', cartId);
+  },
+
+  addReservation: async (res) => {
+    await supabase.from('reservations').insert([{ ...res, status: 'pending' }]);
+  },
+
+  assignTable: async (resId, tableId) => {
+    await supabase.from('reservations').update({ tableId }).eq('id', resId);
+    await supabase.from('tables').update({ status: 'reserved' }).eq('id', tableId);
+  },
+
+  seatReservation: async (resId) => {
+    const { data: res } = await supabase.from('reservations').select('*').eq('id', resId).single();
+    if (res && res.tableId) {
+      await supabase.from('reservations').update({ status: 'seated' }).eq('id', resId);
+      await supabase.from('tables').update({ 
+        status: 'occupied', 
+        guests: res.pax,
+        time_elapsed: 'Just Arrived'
+      }).eq('id', res.tableId);
+    }
+  },
+
+  transferTable: async (floorIndex, sourceId, destId) => {
+    await supabase.from('orders').update({ table_id: destId }).eq('table_id', sourceId);
+    const { data: sourceTable } = await supabase.from('tables').select('*').eq('id', sourceId).single();
+    if (sourceTable) {
+        await supabase.from('tables').update({
+            status: sourceTable.status,
+            guests: sourceTable.guests,
+            time_elapsed: sourceTable.time_elapsed
+        }).eq('id', destId);
+        await supabase.from('tables').update({
+            status: 'empty',
+            guests: 0,
+            time_elapsed: null
+        }).eq('id', sourceId);
+    }
+  }
+}));

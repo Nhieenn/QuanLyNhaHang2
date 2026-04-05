@@ -20,6 +20,8 @@ export const metadata: Metadata = {
   description: "The Elevated Organic Point-of-Sale System",
 };
 
+import { StoreInitializer } from "@/components/layout/StoreInitializer";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -31,6 +33,7 @@ export default function RootLayout({
       className={`${plusJakartaSans.variable} ${workSans.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <StoreInitializer />
         <Shell>{children}</Shell>
       </body>
     </html>
