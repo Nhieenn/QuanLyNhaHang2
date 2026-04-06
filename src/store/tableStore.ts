@@ -44,6 +44,7 @@ export interface Table {
 export interface Floor {
   id: string;
   name: string;
+  name_en?: string;
   tables: Table[];
 }
 
@@ -116,19 +117,22 @@ export const useTableStore = create<TableStore>((set, get) => ({
   },
 
   initializeRealtime: () => {
-    const tablesChannel = supabase.channel('tables_realtime')
+    // Sử dụng ID duy nhất cho channel để tránh xung đột 'after subscribe' khi re-render
+    const suffix = Date.now();
+    
+    const tablesChannel = supabase.channel(`tables_realtime_${suffix}`)
       .on('postgres_changes', { event: '*', table: 'tables', schema: 'public' }, () => get().fetchInitialData())
       .subscribe();
 
-    const ordersChannel = supabase.channel('orders_realtime')
+    const ordersChannel = supabase.channel(`orders_realtime_${suffix}`)
       .on('postgres_changes', { event: '*', table: 'orders', schema: 'public' }, () => get().fetchInitialData())
       .subscribe();
     
-    const resChannel = supabase.channel('res_realtime')
+    const resChannel = supabase.channel(`res_realtime_${suffix}`)
       .on('postgres_changes', { event: '*', table: 'reservations', schema: 'public' }, () => get().fetchInitialData())
       .subscribe();
 
-    const inventoryChannel = supabase.channel('inventory_realtime')
+    const inventoryChannel = supabase.channel(`inventory_realtime_${suffix}`)
       .on('postgres_changes', { event: '*', table: 'ingredients', schema: 'public' }, () => get().fetchInitialData())
       .subscribe();
 
@@ -144,13 +148,26 @@ export const useTableStore = create<TableStore>((set, get) => ({
 
   updateTable: async (floorIndex, tableId, updates) => {
     const dbUpdates: any = { ...updates };
-    if (updates.timeElapsed) dbUpdates.time_elapsed = updates.timeElapsed;
+    
+    // Kiểm tra và chuyển đổi camelCase sang snake_case cho DB
+    if (updates.timeElapsed) {
+      dbUpdates.time_elapsed = updates.timeElapsed;
+      delete dbUpdates.timeElapsed;
+    }
+    
+    // Xóa các trường không thuộc Schema của bảng 'tables' hoặc không được phép update
     delete dbUpdates.orders;
+    delete dbUpdates.id;
+    delete dbUpdates.floorIndex;
 
-    await supabase.from('tables').update(dbUpdates).eq('id', tableId);
+    const { error } = await supabase.from('tables').update(dbUpdates).eq('id', tableId);
+    if (error) {
+      console.error("Error updating table:", error.message);
+    }
   },
 
   addOrderItem: async (tableId, item) => {
+    // 1. Thêm món vào bảng orders
     await supabase.from('orders').insert([{
       table_id: tableId,
       menu_item_id: item.id,
@@ -160,6 +177,9 @@ export const useTableStore = create<TableStore>((set, get) => ({
       status: 'pending',
       notes: ''
     }]);
+
+    // 2. Chuyển trạng thái bàn sang 'occupied' nếu cần
+    await supabase.from('tables').update({ status: 'occupied' }).eq('id', tableId);
   },
 
   updateItemStatus: async (tableId, cartId, status) => {
@@ -173,20 +193,50 @@ export const useTableStore = create<TableStore>((set, get) => ({
   confirmOrders: async (tableId) => {
     const { data } = await supabase.from('orders').select('id').eq('table_id', tableId).eq('status', 'pending');
     if (data && data.length > 0) {
+      // 1. Chuyển trạng thái món sang 'sent'
       await supabase.from('orders').update({ status: 'sent' }).in('id', data.map(o => o.id));
+      
+      // 2. Đảm bảo bàn được đánh dấu là 'occupied'
+      await supabase.from('tables').update({ status: 'occupied' }).eq('id', tableId);
     }
   },
 
   deductInventory: async (tableId) => {
-    // 1. Lấy tất cả các món ăn trong đơn hàng của bàn này
-    const { data: orders } = await supabase
+    console.log(`[Inventory] Starting deduction for table identifier: ${tableId}`);
+
+    // 1. Thử lấy đơn hàng theo tableId trực tiếp (ưu tiên UUID hoặc ID tùy chỉnh như "t1")
+    let { data: orders } = await supabase
       .from('orders')
-      .select('menu_item_id, quantity')
+      .select('menu_item_id, quantity, name')
       .eq('table_id', tableId);
 
-    if (!orders || orders.length === 0) return;
+    // 2. Nếu không thấy đơn hàng, có thể tableId truyền vào là Số bàn (Number), thử tìm ID theo Số bàn
+    if (!orders || orders.length === 0) {
+      console.log(`[Inventory] No orders for ID "${tableId}". Checking if it's a table number...`);
+      const { data: tableData } = await supabase
+        .from('tables')
+        .select('id')
+        .eq('number', tableId)
+        .single();
+      
+      if (tableData) {
+        console.log(`[Inventory] Found ID ${tableData.id} for table number ${tableId}. Retrying fetch...`);
+        const { data: retryOrders } = await supabase
+          .from('orders')
+          .select('menu_item_id, quantity, name')
+          .eq('table_id', tableData.id);
+        orders = retryOrders;
+      }
+    }
 
-    // 2. Với mỗi món ăn, lấy định mức (BOM) tương ứng
+    if (!orders || orders.length === 0) {
+      console.log(`[Inventory] Final check: No orders found to deduct. Table: ${tableId}`);
+      return;
+    }
+
+    console.log(`[Inventory] Processing ${orders.length} unique items for deduction...`);
+
+    // 3. Với mỗi món ăn, lấy định mức (BOM) tương ứng
     for (const order of orders) {
       const { data: bom } = await supabase
         .from('bom_recipe')
@@ -194,25 +244,31 @@ export const useTableStore = create<TableStore>((set, get) => ({
         .eq('product_id', order.menu_item_id);
 
       if (bom && bom.length > 0) {
-        // 3. Thực hiện trừ tồn kho cho từng nguyên liệu
+        console.log(`[Inventory] Found BOM for ${order.name} (${order.menu_item_id}): ${bom.length} ingredients`);
+        
+        // 4. Thực hiện trừ tồn kho cho từng nguyên liệu trong công thức
         for (const recipe of bom) {
           const totalDeduction = recipe.quantity_used * order.quantity;
           
           // Lấy tồn kho hiện tại
           const { data: ingredient } = await supabase
             .from('ingredients')
-            .select('current_stock')
+            .select('current_stock, name')
             .eq('id', recipe.ingredient_id)
             .single();
 
           if (ingredient) {
             const newStock = Math.max(0, Number(ingredient.current_stock) - totalDeduction);
+            console.log(`[Inventory] Updating ${ingredient.name}: ${ingredient.current_stock} -> ${newStock} (Used: ${totalDeduction})`);
+            
             await supabase
               .from('ingredients')
               .update({ current_stock: newStock })
               .eq('id', recipe.ingredient_id);
           }
         }
+      } else {
+        console.log(`[Inventory] No BOM recipe found for item: ${order.name} (${order.menu_item_id})`);
       }
     }
   },
@@ -230,7 +286,20 @@ export const useTableStore = create<TableStore>((set, get) => ({
   },
 
   addReservation: async (res) => {
-    await supabase.from('reservations').insert([{ ...res, status: 'pending' }]);
+    // 1. Thêm bản ghi đặt chỗ
+    const { data: newRes, error } = await supabase
+      .from('reservations')
+      .insert([{ ...res, status: 'pending' }])
+      .select()
+      .single();
+
+    if (!error && res.tableId) {
+      // 2. Nếu có gán bàn, cập nhật trạng thái bàn đó thành 'reserved'
+      await supabase
+        .from('tables')
+        .update({ status: 'reserved', reservationId: newRes.id })
+        .eq('id', res.tableId);
+    }
   },
 
   assignTable: async (resId, tableId) => {

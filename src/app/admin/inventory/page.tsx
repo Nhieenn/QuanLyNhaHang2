@@ -70,6 +70,14 @@ export default function InventoryPage() {
     fetchIngredients();
   };
 
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const totalItems = ingredients.length;
+  const lowStockCount = ingredients.filter(i => i.current_stock <= i.min_stock).length;
+
   const filtered = ingredients.filter(i => 
     i.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     i.id.toLowerCase().includes(searchTerm.toLowerCase())
@@ -100,7 +108,9 @@ export default function InventoryPage() {
             <Package size={20} />
             <span className="text-[10px] font-black uppercase tracking-widest">Tổng mặt hàng</span>
           </div>
-          <div className="text-4xl font-black text-on-surface">{ingredients.length}</div>
+          <div className="text-4xl font-black text-on-surface">
+            {isMounted ? totalItems : 0}
+          </div>
         </div>
         <div className="bg-brand-gold/10 p-8 rounded-[32px] border border-brand-gold/20 shadow-sm">
           <div className="flex items-center gap-4 text-[#856404] mb-4">
@@ -108,7 +118,7 @@ export default function InventoryPage() {
             <span className="text-[10px] font-black uppercase tracking-widest">Sắp hết hàng</span>
           </div>
           <div className="text-4xl font-black text-[#856404]">
-            {ingredients.filter(i => i.current_stock <= i.min_stock).length}
+            {isMounted ? lowStockCount : 0}
           </div>
         </div>
         <div className="bg-brand-teal/10 p-8 rounded-[32px] border border-brand-teal/20 shadow-sm text-on-surface">

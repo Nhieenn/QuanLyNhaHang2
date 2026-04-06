@@ -1,15 +1,16 @@
 "use client";
 
 import React, { useState } from "react";
-import { Clock, AlertTriangle, Check, BookOpen, MessageSquarePlus, Plus } from "lucide-react";
+import { Clock, AlertTriangle, Check, BookOpen, MessageSquarePlus, Plus, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTableStore } from "@/store/tableStore";
 
 interface KDSItem {
   id: string;
   name: string;
   quantity: number;
   note?: string;
-  status: "pending" | "preparing" | "ready";
+  status: "pending" | "sent" | "preparing" | "ready" | "served";
 }
 
 interface KDSOrder {
@@ -74,21 +75,42 @@ const initialOrders: KDSOrder[] = [
 ];
 
 export default function KitchenKDSPage() {
-  const [orders, setOrders] = useState(initialOrders);
+  const { floors, fetchInitialData, initializeRealtime, updateItemStatus } = useTableStore();
+  
+  React.useEffect(() => {
+    fetchInitialData();
+    const cleanup = initializeRealtime();
+    return () => cleanup();
+  }, []);
 
-  const toggleItemStatus = (orderId: string, itemId: string) => {
-    setOrders(prev => prev.map(order => 
-      order.id === orderId 
-        ? {
-            ...order,
-            items: order.items.map(item => 
-              item.id === itemId 
-                ? { ...item, status: item.status === "ready" ? "pending" : "ready" } 
-                : item
-            )
-          }
-        : order
-    ));
+  // Map Real Store Data to KDS Orders
+  const orders: KDSOrder[] = floors.flatMap(floor => 
+    floor.tables
+      .filter(table => table.orders.length > 0)
+      .map(table => ({
+        id: table.id,
+        tableId: table.id, // Lưu lại ID bàn để xử lý nút bấm
+        orderNumber: `#${table.number}`,
+        location: `${table.number === "TAKEAWAY" ? "Mang về" : "Bàn " + table.number}`,
+        guests: table.guests,
+        timeStarted: table.timeElapsed || "Vừa vào",
+        type: (table.number === "TAKEAWAY" ? "takeaway" : "dine-in") as "takeaway" | "dine-in",
+        isUrgent: table.orders.some(o => o.status === "sent"), // Coi là khẩn cấp nếu có món mới chưa nấu
+        items: table.orders
+          .filter(o => o.status !== "pending" && o.status !== "served") // Chỉ hiện món đã gửi bếp và chưa được phục vụ khách
+          .map(o => ({
+            id: o.cartId,
+            name: o.name,
+            quantity: o.quantity,
+            note: o.notes,
+            status: o.status as any
+          }))
+      }))
+  ).filter(order => order.items.length > 0); // Chỉ hiện những đơn có món cần chế biến
+
+  const toggleItemStatus = async (orderId: string, itemId: string, currentStatus: string) => {
+    const nextStatus = currentStatus === "ready" ? "preparing" : "ready";
+    await updateItemStatus(orderId, itemId, nextStatus as any);
   };
 
   return (
@@ -111,13 +133,12 @@ export default function KitchenKDSPage() {
         </div>
       </div>
 
-      {/* Order Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-8 mb-12">
         {orders.map((order) => (
           <KDSOrderCard 
             key={order.id} 
             order={order} 
-            onToggleItem={(itemId) => toggleItemStatus(order.id, itemId)} 
+            onToggleItem={(itemId, status) => toggleItemStatus(order.id, itemId, status)} 
           />
         ))}
       </div>
@@ -125,8 +146,20 @@ export default function KitchenKDSPage() {
   );
 }
 
-function KDSOrderCard({ order, onToggleItem }: { order: KDSOrder, onToggleItem: (id: string) => void }) {
+function KDSOrderCard({ order, onToggleItem }: { 
+  order: KDSOrder, 
+  onToggleItem: (id: string, status: string) => void 
+}) {
+  const { updateItemStatus } = useTableStore();
   const isUrgent = order.isUrgent;
+
+  const handleStatusAll = async (status: "preparing" | "ready") => {
+    for (const item of order.items) {
+      if (item.status !== status) {
+        await updateItemStatus(order.id, item.id, status);
+      }
+    }
+  };
 
   return (
     <div className={cn(
@@ -159,13 +192,16 @@ function KDSOrderCard({ order, onToggleItem }: { order: KDSOrder, onToggleItem: 
           <div 
             key={item.id} 
             className="flex items-start gap-4 group cursor-pointer"
-            onClick={() => onToggleItem(item.id)}
+            onClick={() => onToggleItem(item.id, item.status)}
           >
             <div className={cn(
               "w-8 h-8 rounded-lg flex items-center justify-center border-2 transition-all",
-              item.status === "ready" ? "bg-primary border-primary text-white" : "border-surface-container-highest group-hover:border-primary/30"
+              item.status === "ready" ? "bg-primary border-primary text-white" : 
+              item.status === "preparing" ? "bg-[#71f5ea] border-[#71f5ea] text-[#006a67]" :
+              "border-surface-container-highest group-hover:border-primary/30"
             )}>
               {item.status === "ready" && <Check size={18} />}
+              {item.status === "preparing" && <div className="w-2 h-2 rounded-full bg-current animate-pulse" />}
             </div>
             <div className="flex-1">
               <div className="flex justify-between items-baseline">
@@ -195,10 +231,16 @@ function KDSOrderCard({ order, onToggleItem }: { order: KDSOrder, onToggleItem: 
 
       {/* Card Actions */}
       <div className="p-8 pt-0 grid grid-cols-2 gap-4">
-         <button className="h-16 bg-surface-container-highest/20 rounded-xl font-display font-bold text-on-surface hover:bg-surface-container-highest/40 transition-all touch-target">
+         <button 
+           onClick={() => handleStatusAll("preparing")}
+           className="h-16 bg-surface-container-highest/20 rounded-xl font-display font-bold text-on-surface hover:bg-surface-container-highest/40 transition-all touch-target flex items-center justify-center gap-2"
+          >
             Prepare
          </button>
-         <button className="h-16 bg-primary text-white rounded-xl font-display font-bold hover:bg-primary-dim transition-all shadow-sm touch-target">
+         <button 
+           onClick={() => handleStatusAll("ready")}
+           className="h-16 bg-primary text-white rounded-xl font-display font-bold hover:bg-primary-dim transition-all shadow-sm touch-target flex items-center justify-center gap-2"
+          >
             Ready
          </button>
       </div>

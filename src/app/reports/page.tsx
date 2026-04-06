@@ -12,10 +12,15 @@ import {
   Calendar,
   PieChart,
   BarChart3,
-  Layers
+  Layers,
+  Sparkles,
+  Cpu,
+  MessageSquare,
+  Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSalesStore } from "@/store/salesStore";
+import { useInventoryStore } from "@/store/inventoryStore";
 import { MENU_ITEMS } from "@/constants/menu";
 import { useSettingsStore } from "@/store/settingsStore";
 import { translations } from "@/lib/translations";
@@ -25,8 +30,36 @@ export default function ReportsPage() {
   const t = translations[language].reportsPage;
   const menuT = translations[language].orderMenuPage;
 
-  const { history, getRevenueByRange, getProfitByRange } = useSalesStore();
+  const { history, fetchHistory, getRevenueByRange, getProfitByRange } = useSalesStore();
+  const { items: inventory, fetchItems } = useInventoryStore();
+  
   const [timeRange, setTimeRange] = useState("today");
+  const [isMounted, setIsMounted] = React.useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    setIsMounted(true);
+    fetchHistory();
+    fetchItems();
+  }, []);
+
+  const handleRunAIAnalysis = async () => {
+    setIsAnalyzing(true);
+    try {
+      const response = await fetch("/api/ai/bi", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sales: history, inventory })
+      });
+      const data = await response.json();
+      setAiAnalysis(data.analysis);
+    } catch (error) {
+      setAiAnalysis("Không thể kết nối với AI lúc này.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   const formatShortCurrency = (val: number) => {
     const scaled = val * menuT.priceScale;
@@ -52,9 +85,10 @@ export default function ReportsPage() {
     const itemMap: Record<string, { name: string, qty: number, revenue: number }> = {};
     filteredHistory.forEach(sale => {
       sale.items.forEach(item => {
-        if (!itemMap[item.id]) itemMap[item.id] = { name: item.name, qty: 0, revenue: 0 };
-        itemMap[item.id].qty += item.quantity;
-        itemMap[item.id].revenue += (item.price * item.quantity);
+        const itemId = item.menu_item_id;
+        if (!itemMap[itemId]) itemMap[itemId] = { name: item.name, qty: 0, revenue: 0 };
+        itemMap[itemId].qty += item.quantity;
+        itemMap[itemId].revenue += (item.price * item.quantity);
       });
     });
 
@@ -101,7 +135,7 @@ export default function ReportsPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <StatCard 
             title={t.stats.totalRevenue} 
-            value={formatShortCurrency(stats.revenue)} 
+            value={isMounted ? formatShortCurrency(stats.revenue) : "0 đ"} 
             trend="+12.5%" 
             isUp={true} 
             icon={<DollarSign className="text-brand-teal" />}
@@ -109,7 +143,7 @@ export default function ReportsPage() {
           />
           <StatCard 
             title={t.stats.netProfit} 
-            value={formatShortCurrency(stats.profit)} 
+            value={isMounted ? formatShortCurrency(stats.profit) : "0 đ"} 
             trend="+8.2%" 
             isUp={true} 
             icon={<TrendingUp className="text-primary" />}
@@ -117,7 +151,7 @@ export default function ReportsPage() {
           />
           <StatCard 
             title={t.stats.profitMargin} 
-            value={`${stats.margin.toFixed(1)}%`} 
+            value={isMounted ? `${stats.margin.toFixed(1)}%` : "0%"} 
             trend="-1.2%" 
             isUp={false} 
             icon={<PieChart className="text-brand-gold" />}
@@ -125,7 +159,7 @@ export default function ReportsPage() {
           />
           <StatCard 
             title={t.stats.transactions} 
-            value={stats.totalSales.toString()} 
+            value={isMounted ? stats.totalSales.toString() : "0"} 
             trend="+45" 
             isUp={true} 
             icon={<ShoppingBag className="text-brand-coral" />}
@@ -169,7 +203,7 @@ export default function ReportsPage() {
           <div className="col-span-4 bg-surface-container-lowest rounded-[40px] p-10 border border-surface-container-low shadow-sm flex flex-col">
             <h3 className="text-2xl font-black text-on-surface tracking-tight mb-8">{t.charts.bestSellers}</h3>
             <div className="flex flex-col gap-6 flex-1">
-              {stats.topItems.length > 0 ? stats.topItems.map((item, i) => (
+              {isMounted && stats.topItems.length > 0 ? stats.topItems.map((item, i) => (
                 <div key={item.name} className="flex items-center gap-4">
                   <div className={cn(
                     "w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xs",
@@ -192,7 +226,7 @@ export default function ReportsPage() {
                 </div>
               )}
             </div>
-            {stats.topItems.length > 0 && (
+            {isMounted && stats.topItems.length > 0 && (
               <button className="mt-8 py-4 bg-surface-container-low w-full rounded-2xl font-black text-[10px] uppercase tracking-widest text-outline hover:bg-surface-container hover:text-on-surface transition-all">
                 {t.charts.fullInventory}
               </button>
@@ -200,26 +234,79 @@ export default function ReportsPage() {
           </div>
         </div>
 
-        {/* Category Performance */}
-        <div className="bg-on-surface text-white rounded-[40px] p-12 overflow-hidden relative">
-          <div className="relative z-10 grid grid-cols-3 gap-12">
-            <div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="bg-white rounded-[40px] p-10 border border-surface-container-low shadow-sm flex flex-col relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
+              <Sparkles size={120} className="text-primary" />
+            </div>
+            
+            <div className="flex items-center gap-4 mb-8">
+              <div className="p-3 bg-primary/10 rounded-2xl">
+                <Cpu className="text-primary" size={24} />
+              </div>
+              <div>
+                <h3 className="text-2xl font-black text-on-surface tracking-tight">Business Intelligence</h3>
+                <p className="text-[10px] text-outline font-black uppercase tracking-widest mt-1">Cố vấn Gemini AI</p>
+              </div>
+            </div>
+
+            <div className="bg-surface-container-low/50 rounded-3xl p-8 flex-1 border border-dashed border-surface-container mb-6">
+              {isAnalyzing ? (
+                <div className="flex flex-col items-center justify-center h-full gap-4 text-outline">
+                  <Loader2 className="animate-spin" size={32} />
+                  <p className="font-black text-xs uppercase tracking-widest animate-pulse">Đang soi dữ liệu...</p>
+                </div>
+              ) : aiAnalysis ? (
+                <div className="prose prose-sm prose-slate max-w-none">
+                  <div className="flex items-start gap-4 mb-4">
+                    <div className="mt-1">
+                      <MessageSquare size={16} className="text-primary" />
+                    </div>
+                    <div className="text-sm font-bold text-on-surface leading-relaxed whitespace-pre-wrap">
+                      {aiAnalysis}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-center gap-4">
+                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-inner">
+                    <Sparkles className="text-outline/20" size={24} />
+                  </div>
+                  <p className="text-sm text-outline font-bold px-10">
+                    Nhấn nút bên dưới để nhận phân tích kinh doanh thực tế từ trí tuệ nhân tạo.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <button 
+              onClick={handleRunAIAnalysis}
+              disabled={isAnalyzing}
+              className="py-5 bg-on-surface text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-lg shadow-on-surface/20 active:scale-95 transition-all flex items-center justify-center gap-3 hover:bg-black"
+            >
+              {isAnalyzing ? "Đang xử lý..." : "Chạy Phân tích thông minh"}
+              {!isAnalyzing && <Sparkles size={16} />}
+            </button>
+          </div>
+
+          <div className="bg-on-surface text-white rounded-[40px] p-10 overflow-hidden relative">
+            <div className="relative z-10">
               <h3 className="text-brand-teal text-[10px] font-black uppercase tracking-[0.2em] mb-2">{t.insights.categorySplit}</h3>
-              <h2 className="text-4xl font-black tracking-tight leading-none">{t.insights.coffeeDriver}</h2>
-              <p className="mt-4 text-white/60 font-bold leading-relaxed text-sm">
-                {t.insights.signatureDrinks}
+              <h2 className="text-4xl font-black tracking-tight leading-none mb-10">{t.insights.coffeeDriver}</h2>
+              
+              <div className="flex flex-col gap-8">
+                <CategoryStat label={t.insights.coffee} value="74%" color="#71f5ea" />
+                <CategoryStat label={t.insights.teas} value="18%" color="#ffca51" />
+                <CategoryStat label={t.insights.bites} value="8%" color="#ff8fab" />
+              </div>
+
+              <p className="mt-12 text-white/40 font-bold leading-relaxed text-sm">
+                AI phân tích: Món "Cà phê máy" đang là động lực tăng trưởng chính của nhà hàng.
               </p>
             </div>
             
-            <div className="col-span-2 grid grid-cols-3 gap-8">
-              <CategoryStat label={t.insights.coffee} value="74%" color="#71f5ea" />
-              <CategoryStat label={t.insights.teas} value="18%" color="#ffca51" />
-              <CategoryStat label={t.insights.bites} value="8%" color="#ff8fab" />
-            </div>
+            <div className="absolute top-[-50%] right-[-10%] w-[600px] h-[600px] bg-primary/20 rounded-full blur-[120px]" />
           </div>
-          
-          {/* Abstract Bg Decor */}
-          <div className="absolute top-[-50%] right-[-10%] w-[600px] h-[600px] bg-primary/20 rounded-full blur-[120px]" />
         </div>
 
       </main>

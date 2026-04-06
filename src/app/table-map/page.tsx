@@ -14,10 +14,27 @@ export default function TableMapPage() {
   const [source, setSource] = useState<{ floor: number; id: string } | null>(null);
   const [target, setTarget] = useState<{ floor: number; id: string } | null>(null);
   
-  const { floors, updateTable, setFloors, updateItemStatus, seatReservation, reservations, transferTable } = useTableStore();
+  const { 
+    floors, 
+    updateTable, 
+    setFloors, 
+    updateItemStatus, 
+    seatReservation, 
+    reservations, 
+    transferTable,
+    fetchInitialData,
+    initializeRealtime
+  } = useTableStore();
+  
   const { language } = useSettingsStore();
   const t = translations[language].tableMapPage;
   const commonT = translations[language].common;
+
+  React.useEffect(() => {
+    fetchInitialData();
+    const cleanup = initializeRealtime();
+    return () => cleanup();
+  }, []);
 
   // Helper to get localized floor name (handles legacy data without ID)
   const getFloorName = (floor: any) => {
@@ -162,7 +179,9 @@ export default function TableMapPage() {
       <div className="flex justify-between items-end mb-4">
         <div className="animate-in fade-in slide-in-from-left-4 duration-500">
           <h2 className="text-3xl font-extrabold text-on-surface tracking-tight">
-            {getFloorName(activeFloor)}
+            {language === 'en' && floors[activeFloorIndex]?.name_en 
+              ? floors[activeFloorIndex].name_en 
+              : getFloorName(activeFloor)}
           </h2>
           <p className="text-outline mt-1 font-medium">{activeFloor.tables ? activeFloor.tables.filter(t => t.status !== "empty").length : 0}/{activeFloor.tables ? activeFloor.tables.length : 0} {t.activeTables}</p>
         </div>
@@ -247,7 +266,10 @@ export default function TableMapPage() {
           <div>
             <h3 className="text-xl font-bold text-on-surface tracking-tight">{t.switchView}</h3>
             <p className="text-sm text-outline font-medium">
-              {getFloorName(floors[(activeFloorIndex + 1) % floors.length])}
+              {(() => {
+                const groundFloor = floors[(activeFloorIndex + 1) % floors.length];
+                return language === 'en' && groundFloor?.name_en ? groundFloor.name_en : groundFloor?.name;
+              })()}
             </p>
           </div>
           <div className="flex gap-2">

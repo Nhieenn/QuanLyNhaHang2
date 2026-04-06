@@ -43,11 +43,20 @@ function CheckoutContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const tableId = searchParams.get("table");
-  const { floors, updateTable } = useTableStore();
+  const { floors, updateTable, clearOrders, fetchInitialData, initializeRealtime } = useTableStore();
+
+  useEffect(() => {
+    fetchInitialData();
+    const cleanup = initializeRealtime();
+    return () => cleanup();
+  }, []);
   
   const formatCurrency = (val: number) => {
     const scaled = val * menuT.priceScale;
-    return scaled.toLocaleString(language === 'vi' ? 'vi-VN' : 'en-US') + menuT.currencySymbol;
+    return scaled.toLocaleString(language === 'vi' ? 'vi-VN' : 'en-US', {
+      minimumFractionDigits: language === 'vi' ? 0 : 2,
+      maximumFractionDigits: language === 'vi' ? 0 : 2
+    }) + menuT.currencySymbol;
   };
   
   const [paymentMethod, setPaymentMethod] = useState<string>("card");
@@ -84,8 +93,8 @@ function CheckoutContent() {
     ? (allItems.reduce((acc: number, item: OrderItem) => acc + (item.price * item.quantity), 0) / activeSplit.count)
     : displayItems.reduce((acc: number, item: OrderItem) => acc + (item.price * item.quantity), 0);
 
-  const tax = subtotal * 0.10; 
-  const serviceCharge = subtotal * 0.05; 
+  const tax = Math.round(subtotal * 0.10 * 100) / 100; 
+  const serviceCharge = Math.round(subtotal * 0.05 * 100) / 100; 
   const total = subtotal + tax + serviceCharge;
 
   const { addSale } = useSalesStore();
@@ -101,12 +110,12 @@ function CheckoutContent() {
     }, 0);
   };
 
-  const handleCompletePayment = () => {
+  const handleCompletePayment = async () => {
     if (!tableId || !currentTable) return;
 
     // Chuẩn bị dữ liệu Sale để lưu báo cáo
     const recordedItems = displayItems.map(item => ({
-      id: item.id,
+      menu_item_id: item.id,
       name: item.name,
       price: item.price,
       quantity: item.quantity,
@@ -123,29 +132,20 @@ function CheckoutContent() {
     });
 
     if (activeSplit?.mode === "itemized") {
-      // Chỉ xóa các món đã thanh toán
+      // Logic cho tách hóa đơn theo món vẫn giữ nguyên
       const remainingOrders = allItems.filter((item: OrderItem) => !activeSplit.selectedCartIds.includes(item.cartId));
       
       if (remainingOrders.length === 0) {
-        updateTable(currentFloorIndex, tableId, {
-          status: "empty",
-          guests: undefined,
-          timeElapsed: undefined,
-          orders: []
-        });
+        await clearOrders(currentTable.id);
       } else {
-        updateTable(currentFloorIndex, tableId, {
+        // Tạm thời update list món còn lại (Chưa trừ kho ở bước này vì khách chưa trả hết bàn)
+        await updateTable(currentFloorIndex, currentTable.id, {
           orders: remainingOrders
         });
       }
     } else {
-      // Equal Split hoặc Full Payment
-      updateTable(currentFloorIndex, tableId, {
-        status: "empty",
-        guests: undefined,
-        timeElapsed: undefined,
-        orders: []
-      });
+      // Thanh toán toàn bộ bàn - Kích hoạt trừ kho và Reset bàn
+      await clearOrders(currentTable.id);
     }
     
     setIsSuccess(true);
@@ -296,7 +296,7 @@ function CheckoutContent() {
             <span>{formatCurrency(serviceCharge)}</span>
           </div>
           <div className="flex justify-between text-outline text-base font-bold text-[10px] uppercase tracking-widest opacity-40">
-             <span>{t.vatIncluded}</span>
+             <span>VAT (10%)</span>
              <span>{formatCurrency(tax)}</span>
           </div>
         </div>

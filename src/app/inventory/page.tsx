@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Plus, 
   Settings2, 
@@ -19,9 +19,16 @@ export default function InventoryPage() {
   const t = translations[language].inventoryPage;
   const menuT = translations[language].orderMenuPage;
 
-  const { items, getLowStockCount, getTotalAssetValue } = useInventoryStore();
+  const { items, getLowStockCount, getTotalAssetValue, fetchItems, subscribeRealtime, loading } = useInventoryStore();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showBOMModal, setShowBOMModal] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    fetchItems();
+    subscribeRealtime();
+  }, []);
 
   const lowStockCount = getLowStockCount();
   const totalAssets = getTotalAssetValue();
@@ -66,12 +73,12 @@ export default function InventoryPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <SummaryCard 
           type="low-stock" 
-          value={lowStockCount} 
+          value={isMounted ? lowStockCount : 0} 
           label={t.lowStockLabel} 
         />
         <SummaryCard 
           type="assets" 
-          value={formatCurrency(totalAssets)} 
+          value={isMounted ? formatCurrency(totalAssets) : "0"} 
           label={t.currentAssets} 
         />
         <SummaryCard 
