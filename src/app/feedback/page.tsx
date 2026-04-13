@@ -27,7 +27,17 @@ import { HistoryModal } from "@/components/feedback/HistoryModal";
 
 // Removed static mockup
 
+import { Suspense } from "react";
+
 export default function FeedbackPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading feedback...</div>}>
+      <FeedbackContent />
+    </Suspense>
+  );
+}
+
+function FeedbackContent() {
   const { language } = useSettingsStore();
   const t = translations[language].feedbackPage;
   

@@ -8,6 +8,8 @@
     "build:export": "next build && npx cap sync",
     "start": "next start",
     "lint": "eslint",
+    "analyze": "npx gitnexus analyze",
+    "nexus:status": "npx gitnexus status",
     "cap:sync": "npx cap sync",
     "cap:open-ios": "npx cap open ios",
     "cap:open-android": "npx cap open android"

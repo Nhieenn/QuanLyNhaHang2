@@ -87,8 +87,8 @@ export function Header() {
     )
   );
 
-  const handleSwitchUser = (pin: string) => {
-    const success = switchUser(pin);
+  const handleSwitchUser = async (pin: string) => {
+    const success = await switchUser(pin);
     if (success) {
       setShowSwitchModal(false);
       setShowUserMenu(false);

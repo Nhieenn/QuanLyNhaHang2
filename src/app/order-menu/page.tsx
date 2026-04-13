@@ -44,7 +44,7 @@ function OrderMenuContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const tableId = searchParams.get("table");
-  const { floors, addOrderItem, confirmOrders, updateItemNote, updateTable } = useTableStore();
+  const { floors, addOrderItem, confirmOrders, updateItemNote, updateTable, deleteOrderItem, clearPendingOrders, processingIds } = useTableStore();
   const { language } = useSettingsStore();
 
   // Menu Cloud Integration
@@ -85,11 +85,26 @@ function OrderMenuContent() {
 
   // Tìm bàn hiện tại dựa trên ID từ URL
   let currentTable: any = null;
-  for (const floor of floors) {
-    const table = floor.tables.find(t => t.id === tableId || t.number === tableId);
-    if (table) {
-      currentTable = table;
-      break;
+  
+  // Quick priority check for TAKEAWAY ID
+  if (tableId === "TAKEAWAY") {
+    for (const floor of floors) {
+      const table = floor.tables.find(t => t.id === "TAKEAWAY" || t.number === "TAKEAWAY");
+      if (table) {
+        currentTable = table;
+        break;
+      }
+    }
+  }
+
+  // Fallback to standard search if not found or not takeaway
+  if (!currentTable) {
+    for (const floor of floors) {
+      const table = floor.tables.find(t => t.id === tableId || t.number === tableId);
+      if (table) {
+        currentTable = table;
+        break;
+      }
     }
   }
 
@@ -198,12 +213,12 @@ function OrderMenuContent() {
           <button 
             onClick={() => {
               if (!tableId) return;
-              const nonPending = cart.filter((i: any) => i.status !== "pending");
-              updateTable(0, tableId, { orders: nonPending });
+              clearPendingOrders(tableId);
             }}
-            className="w-12 h-12 flex items-center justify-center rounded-full bg-white text-brand-coral shadow-sm hover:bg-brand-coral/10 hover:text-on-coral transition-colors"
+            disabled={!tableId || processingIds.has(`clear-${tableId}`)}
+            className="w-12 h-12 flex items-center justify-center rounded-full bg-white text-brand-coral shadow-sm hover:bg-brand-coral/10 hover:text-on-coral transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            <Trash2 size={22} strokeWidth={2.5} />
+            <Trash2 size={22} strokeWidth={2.5} className={processingIds.has(`clear-${tableId}`) ? "animate-pulse" : ""} />
           </button>
         </div>
 
@@ -315,10 +330,11 @@ function OrderMenuContent() {
                 {/* Individual Delete for Pending Items */}
                 {isPending && (
                   <button 
-                    onClick={() => tableId && useTableStore.getState().updateTable(0, tableId, { orders: cart.filter((o: any) => o.cartId !== item.cartId) })}
-                    className="text-brand-coral/40 hover:text-brand-coral transition-colors"
+                    onClick={() => tableId && deleteOrderItem(item.cartId)}
+                    disabled={processingIds.has(`delete-${item.cartId}`)}
+                    className="text-brand-coral/40 hover:text-brand-coral transition-colors disabled:opacity-20"
                   >
-                    <X size={16} strokeWidth={3} />
+                    <X size={16} strokeWidth={3} className={processingIds.has(`delete-${item.cartId}`) ? "animate-spin" : ""} />
                   </button>
                 )}
               </div>

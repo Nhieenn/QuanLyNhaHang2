@@ -63,40 +63,41 @@ interface TableStore {
   updateItemNote: (tableId: string, cartId: string, notes: string) => Promise<void>;
   confirmOrders: (tableId: string) => Promise<void>;
   clearOrders: (tableId: string) => Promise<void>;
+  deleteOrderItem: (cartId: string) => Promise<void>;
+  clearPendingOrders: (tableId: string) => Promise<void>;
   markAsServed: (tableId: string, cartId: string) => Promise<void>;
   addReservation: (res: Omit<Reservation, "id" | "status">) => Promise<void>;
   assignTable: (resId: string, tableId: string) => Promise<void>;
   seatReservation: (resId: string) => Promise<void>;
   transferTable: (floorIndex: number, sourceId: string, destId: string) => Promise<void>;
   deductInventory: (tableId: string) => Promise<void>;
+  processingIds: Set<string>;
+  ensureInfrastructure: () => Promise<void>;
 }
 
 export const useTableStore = create<TableStore>((set, get) => ({
   floors: [],
   reservations: [],
   loading: false,
+  processingIds: new Set(),
+  isRealtimeInitialized: false,
 
   fetchInitialData: async () => {
     set({ loading: true });
     
-    // Fetch Floors
+    // 1. Fetch all data from Supabase (READ ONLY - NO UPSERTS HERE)
     const { data: floorsData } = await supabase.from('floors').select('*');
-    // Fetch Tables
     const { data: tablesData } = await supabase.from('tables').select('*');
-    // Fetch Orders
     const { data: ordersData } = await supabase.from('orders').select('*');
-    // Fetch Reservations
     const { data: resData } = await supabase.from('reservations').select('*');
 
+    // 3. Process and merge data into state
     if (floorsData && tablesData) {
-      const floorsWithTables = floorsData.map(floor => ({
-        ...floor,
-        tables: tablesData
+      const floorsWithTables = floorsData.map(floor => {
+        const floorTables = tablesData
           .filter(table => table.floor_id === floor.id)
-          .map(table => ({
-            ...table,
-            timeElapsed: table.time_elapsed,
-            orders: ordersData 
+          .map(table => {
+            const tableOrders = ordersData 
               ? ordersData
                   .filter(o => o.table_id === table.id)
                   .map(o => ({
@@ -109,14 +110,38 @@ export const useTableStore = create<TableStore>((set, get) => ({
                     notes: o.notes,
                     timestamp: new Date(o.created_at).getTime()
                   }))
-              : []
-          }))
-      }));
-      set({ floors: floorsWithTables, reservations: resData || [], loading: false });
+              : [];
+
+            return {
+              ...table,
+              id: table.id, // Use standard id from DB
+              timeElapsed: table.time_elapsed,
+              orders: tableOrders
+            };
+          });
+
+        return {
+          ...floor,
+          tables: floorTables
+        };
+      });
+
+      set({ 
+        floors: floorsWithTables, 
+        reservations: resData || [], 
+        loading: false 
+      });
     }
   },
 
   initializeRealtime: () => {
+    if (get().isRealtimeInitialized) return () => {};
+
+    // 1. Trigger infrastructure check (Takeaway table)
+    get().ensureInfrastructure();
+    
+    set({ isRealtimeInitialized: true });
+
     // Sử dụng ID duy nhất cho channel để tránh xung đột 'after subscribe' khi re-render
     const suffix = Date.now();
     
@@ -141,6 +166,7 @@ export const useTableStore = create<TableStore>((set, get) => ({
       supabase.removeChannel(ordersChannel);
       supabase.removeChannel(resChannel);
       supabase.removeChannel(inventoryChannel);
+      set({ isRealtimeInitialized: false });
     };
   },
 
@@ -281,6 +307,77 @@ export const useTableStore = create<TableStore>((set, get) => ({
      await supabase.from('tables').update({ status: 'empty', guests: 0, time_elapsed: null }).eq('id', tableId);
   },
 
+  clearPendingOrders: async (tableId) => {
+    // 0. Prevent duplicate requests
+    if (get().processingIds.has(`clear-${tableId}`)) return;
+    
+    set(state => {
+      const newIds = new Set(state.processingIds);
+      newIds.add(`clear-${tableId}`);
+      return { processingIds: newIds };
+    });
+
+    try {
+      // 1. Optimistic Update
+      const prevFloors = get().floors;
+      const updatedFloors = prevFloors.map(floor => ({
+        ...floor,
+        tables: floor.tables.map(table => 
+          table.id === tableId 
+            ? { ...table, orders: table.orders.filter(o => o.status !== 'pending') }
+            : table
+        )
+      }));
+      set({ floors: updatedFloors });
+
+      // 2. Background Sync
+      const { error } = await supabase.from('orders').delete().eq('table_id', tableId).eq('status', 'pending');
+      if (error) console.error("Error clearing pending orders:", error.message);
+    } finally {
+      // 3. Re-enable the action
+      set(state => {
+        const newIds = new Set(state.processingIds);
+        newIds.delete(`clear-${tableId}`);
+        return { processingIds: newIds };
+      });
+    }
+  },
+
+  deleteOrderItem: async (cartId) => {
+    // 0. Prevent duplicate requests
+    if (get().processingIds.has(`delete-${cartId}`)) return;
+
+    set(state => {
+      const newIds = new Set(state.processingIds);
+      newIds.add(`delete-${cartId}`);
+      return { processingIds: newIds };
+    });
+
+    try {
+      // 1. Optimistic Update
+      const prevFloors = get().floors;
+      const updatedFloors = prevFloors.map(floor => ({
+        ...floor,
+        tables: floor.tables.map(table => ({
+          ...table,
+          orders: table.orders.filter(o => o.cartId !== cartId)
+        }))
+      }));
+      set({ floors: updatedFloors });
+
+      // 2. Background Sync
+      const { error } = await supabase.from('orders').delete().eq('id', cartId);
+      if (error) console.error("Error deleting order item:", error.message);
+    } finally {
+      // 3. Re-enable the action
+      set(state => {
+        const newIds = new Set(state.processingIds);
+        newIds.delete(`delete-${cartId}`);
+        return { processingIds: newIds };
+      });
+    }
+  },
+
   markAsServed: async (tableId, cartId) => {
     await supabase.from('orders').update({ status: 'served' }).eq('id', cartId);
   },
@@ -333,6 +430,68 @@ export const useTableStore = create<TableStore>((set, get) => ({
             guests: 0,
             time_elapsed: null
         }).eq('id', sourceId);
+    }
+  },
+
+  ensureInfrastructure: async () => {
+    try {
+      // 1. Check for 'Direct Orders' floor (ID-based is safest)
+      let { data: takeawayFloor } = await supabase
+        .from('floors')
+        .select('id')
+        .eq('id', 'takeaway')
+        .maybeSingle();
+
+      if (!takeawayFloor) {
+        // Double check by name if ID check failed
+        const { data: byName } = await supabase
+          .from('floors')
+          .select('id')
+          .or('name.eq.Direct Orders,name.eq.Đơn hàng trực tiếp')
+          .maybeSingle();
+        
+        if (byName) {
+          takeawayFloor = byName;
+        } else {
+          const { data: newFloor, error: floorError } = await supabase
+            .from('floors')
+            .insert([{ 
+              id: 'takeaway',
+              name: 'Đơn hàng trực tiếp',
+              name_en: 'Direct Orders'
+            }])
+            .select()
+            .single();
+          
+          if (floorError) throw floorError;
+          takeawayFloor = newFloor;
+        }
+      }
+
+      if (takeawayFloor) {
+        // 2. Check for 'TAKEAWAY' table in that floor
+        const { data: takeawayTable } = await supabase
+          .from('tables')
+          .select('id')
+          .eq('number', 'TAKEAWAY')
+          .eq('floor_id', takeawayFloor.id)
+          .maybeSingle();
+
+        if (!takeawayTable) {
+          const { error: tableError } = await supabase
+            .from('tables')
+            .insert([{ 
+              id: 'TAKEAWAY',
+              number: 'TAKEAWAY', 
+              floor_id: takeawayFloor.id, 
+              status: 'empty' 
+            }]);
+          
+          if (tableError) throw tableError;
+        }
+      }
+    } catch (error) {
+      console.error("Infrastructure setup failed:", error);
     }
   }
 }));
